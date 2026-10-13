@@ -21,14 +21,12 @@ public:
     explicit Clock(std::chrono::year_month_day start = std::chrono::year_month_day{
                        std::chrono::year{2026}, std::chrono::month{10}, std::chrono::day{5}});
 
-    std::chrono::year_month_day dateOf(int day) const;
     int weekdayOf(int day) const;  // 0 = понедельник ... 6 = воскресенье
     bool isWeekend(int day) const { return weekdayOf(day) >= 5; }
 
     std::string dayString(int day) const;     // "Пн 05.10"
     std::string timeString(Minutes t) const;  // "Пн 05.10 14:30"
     static std::string hhmm(Minutes t);       // "14:30"
-    static const char* weekdayName(int weekday);
 
 private:
     std::chrono::sys_days start_;
@@ -44,9 +42,6 @@ struct WorkSchedule {
     Minutes workdayLength() const { return workEnd - workStart; }
     Minutes periodEnd() const { return dayStart(days - 1) + workEnd; }
     bool isWorkingDay(int day) const { return day >= 0 && day < days && !clock.isWeekend(day); }
-    bool isWorkingTime(Minutes t) const {
-        return isWorkingDay(dayOf(t)) && minuteOfDay(t) >= workStart && minuteOfDay(t) < workEnd;
-    }
     // Длительность командировки на n дней: с начала первого до конца последнего рабочего дня.
     Minutes tripDuration(int n) const { return (n - 1) * kMinutesPerDay + workdayLength(); }
 };

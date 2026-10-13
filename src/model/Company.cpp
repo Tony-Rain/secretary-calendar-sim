@@ -13,9 +13,6 @@ Employee::Employee(int id, std::string name, std::string email, Department* depa
 Room::Room(int id, std::string name, int capacity)
     : id_(id), name_(std::move(name)), capacity_(capacity) {}
 
-DepartmentRoom::DepartmentRoom(int id, std::string name, int capacity, Department* owner)
-    : Room(id, std::move(name), capacity), owner_(owner) {}
-
 Department::Department(int id, std::string name) : id_(id), name_(std::move(name)) {}
 
 std::vector<Employee*> Department::staff() const {
@@ -24,21 +21,12 @@ std::vector<Employee*> Department::staff() const {
     return result;
 }
 
-Employee* Department::addEmployee(std::unique_ptr<Employee> e) {
-    Employee* raw = e.get();
-    if (raw->isHead()) head_ = static_cast<DepartmentHead*>(raw);
-    staff_.push_back(std::move(e));
-    return raw;
-}
-
-namespace {
-
-const std::vector<std::string> kDepartmentNames = {
+static const std::vector<std::string> kDepartmentNames = {
     "Бухгалтерия", "Отдел кадров", "Отдел продаж",      "Маркетинг",   "IT-отдел",
     "Юридический отдел", "Логистика", "Отдел закупок", "Аналитический отдел",
 };
 
-const std::vector<std::string> kSurnames = {
+static const std::vector<std::string> kSurnames = {
     "Иванов",   "Петров",   "Сидоров",  "Смирнов",   "Кузнецов", "Попов",    "Васильев",
     "Соколов",  "Михайлов", "Новиков",  "Фёдоров",   "Морозов",  "Волков",   "Алексеев",
     "Лебедев",  "Семёнов",  "Егоров",   "Павлов",    "Козлов",   "Степанов", "Николаев",
@@ -48,16 +36,14 @@ const std::vector<std::string> kSurnames = {
     "Максимов", "Поляков",  "Сорокин",  "Виноградов", "Ковалёв", "Белов",    "Медведев",
 };
 
-const std::vector<std::string> kInitials = {"А", "Б", "В", "Г", "Д", "Е", "И", "К", "Л", "М",
+static const std::vector<std::string> kInitials = {"А", "Б", "В", "Г", "Д", "Е", "И", "К", "Л", "М",
                            "Н", "О", "П", "Р", "С", "Т", "Ф", "Ю", "Я"};
 
 // Случайный элемент списка.
-std::string pick(const std::vector<std::string>& items, std::mt19937& rng) {
+static std::string pick(const std::vector<std::string>& items, std::mt19937& rng) {
     std::uniform_int_distribution<int> dist(0, static_cast<int>(items.size()) - 1);
     return items[dist(rng)];
 }
-
-}  // namespace
 
 // Случайное ФИО вида "Петров А.С.", не совпадающее с уже выданными.
 static std::string uniqueName(std::set<std::string>& used, std::mt19937& rng) {
@@ -85,20 +71,22 @@ std::unique_ptr<Company> Company::generate(int departments, int staffPerDepartme
     for (int d = 0; d < departments; ++d) {
         auto dept = std::make_unique<Department>(d, kDepartmentNames[d % kDepartmentNames.size()]);
         auto room = std::make_unique<DepartmentRoom>(
-            nextRoomId++, "Каб. " + std::to_string(101 + d * 100), staffPerDepartment + 3,
-            dept.get());
+            nextRoomId++, "Каб. " + std::to_string(101 + d * 100), staffPerDepartment + 3);
         dept->setRoom(room.get());
         company->rooms_.push_back(std::move(room));
 
+        // Сначала руководитель, потом сотрудники.
         for (int i = 0; i <= staffPerDepartment; ++i) {
             int id = nextPersonId++;
+            std::string name = uniqueName(usedNames, rng);
             std::string email = "emp" + std::to_string(id) + "@firm.local";
-            std::unique_ptr<Employee> e;
-            if (i == 0)
-                e = std::make_unique<DepartmentHead>(id, uniqueName(usedNames, rng), email, dept.get());
-            else
-                e = std::make_unique<Employee>(id, uniqueName(usedNames, rng), email, dept.get());
-            dept->addEmployee(std::move(e));
+            if (i == 0) {
+                auto head = std::make_unique<DepartmentHead>(id, name, email, dept.get());
+                dept->setHead(head.get());
+                dept->addEmployee(std::move(head));
+            } else {
+                dept->addEmployee(std::make_unique<Employee>(id, name, email, dept.get()));
+            }
         }
         company->departments_.push_back(std::move(dept));
     }
@@ -122,12 +110,6 @@ Employee* Company::findEmployee(int id) const {
     for (const auto& d : departments_)
         for (Employee* e : d->staff())
             if (e->id() == id) return e;
-    return nullptr;
-}
-
-Room* Company::findRoom(int id) const {
-    for (const auto& r : rooms_)
-        if (r->id() == id) return r.get();
     return nullptr;
 }
 

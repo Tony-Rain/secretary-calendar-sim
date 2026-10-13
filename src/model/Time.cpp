@@ -6,24 +6,16 @@ namespace sec {
 
 Clock::Clock(std::chrono::year_month_day start) : start_(std::chrono::sys_days{start}) {}
 
-std::chrono::year_month_day Clock::dateOf(int day) const {
-    return std::chrono::year_month_day{start_ + std::chrono::days{day}};
-}
-
 int Clock::weekdayOf(int day) const {
     std::chrono::weekday wd{start_ + std::chrono::days{day}};
-    return static_cast<int>(wd.iso_encoding()) - 1;
-}
-
-const char* Clock::weekdayName(int weekday) {
-    static const char* names[] = {"Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"};
-    return names[weekday % 7];
+    return static_cast<int>(wd.iso_encoding()) - 1;  // iso: 1 = Пн ... 7 = Вс
 }
 
 std::string Clock::dayString(int day) const {
-    auto d = dateOf(day);
+    static const char* names[] = {"Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"};
+    std::chrono::year_month_day d{start_ + std::chrono::days{day}};
     char buf[32];
-    std::snprintf(buf, sizeof buf, "%s %02u.%02u", weekdayName(weekdayOf(day)),
+    std::snprintf(buf, sizeof buf, "%s %02u.%02u", names[weekdayOf(day)],
                   static_cast<unsigned>(d.day()), static_cast<unsigned>(d.month()));
     return buf;
 }

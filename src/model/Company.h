@@ -66,16 +66,14 @@ private:
     int capacity_;
 };
 
+// Помещение отдела.
 class DepartmentRoom : public Room {
 public:
-    DepartmentRoom(int id, std::string name, int capacity, Department* owner);
-    Department* owner() const { return owner_; }
+    using Room::Room;
     bool isShared() const override { return false; }
-
-private:
-    Department* owner_;
 };
 
+// Общий конференц-зал фирмы.
 class ConferenceHall : public Room {
 public:
     using Room::Room;
@@ -95,7 +93,8 @@ public:
     std::vector<Employee*> staff() const;  // руководитель + сотрудники
 
     void setRoom(DepartmentRoom* room) { room_ = room; }
-    Employee* addEmployee(std::unique_ptr<Employee> e);
+    void setHead(DepartmentHead* head) { head_ = head; }
+    void addEmployee(std::unique_ptr<Employee> e) { staff_.push_back(std::move(e)); }
 
 private:
     int id_;
@@ -118,7 +117,6 @@ public:
     std::vector<Employee*> allEmployees() const;
     std::vector<Employee*> heads() const;
     Employee* findEmployee(int id) const;
-    Room* findRoom(int id) const;
 
 private:
     std::vector<std::unique_ptr<Department>> departments_;

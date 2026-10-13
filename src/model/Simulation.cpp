@@ -83,21 +83,10 @@ void Simulation::removeFinished() {
 
 void Simulation::sendReminders() {
     std::vector<Message> sent = notifier_.process(calendar_, now_);
-    stats_.reminders += static_cast<int>(sent.size());
-
-    // Письма об одном событии идут подряд — пишем в журнал одну строку на событие.
-    size_t i = 0;
-    while (i < sent.size()) {
-        size_t j = i;
-        while (j < sent.size() && sent[j].eventTitle == sent[i].eventTitle &&
-               sent[j].eventStart == sent[i].eventStart)
-            ++j;
-        addLog("Напоминание о «" + sent[i].eventTitle + "» (" +
-               schedule_.clock.timeString(sent[i].eventStart) + ") отправлено " +
-               std::to_string(j - i) + " участникам");
-        i = j;
-    }
+    if (sent.empty()) return;
     for (const Message& m : sent) messages_.push_back(m);
+    stats_.reminders += static_cast<int>(sent.size());
+    addLog("Отправлено напоминаний: " + std::to_string(sent.size()));
 }
 
 void Simulation::submit(std::unique_ptr<Event> event, int replacesId) {
@@ -116,7 +105,7 @@ void Simulation::handleRequest(std::unique_ptr<Event> event, int replacesId, boo
     addLog("Конфликт у «" + event->title() + "»: " + conflicts[0].text);
 
     if (autoResolve) {
-        resolveAutomatically(std::move(event), replacesId);
+        resolveAutomatically(std::move(event), replacesId, conflicts);
         return;
     }
     pending_ = std::make_unique<PendingRequest>();
@@ -125,8 +114,8 @@ void Simulation::handleRequest(std::unique_ptr<Event> event, int replacesId, boo
     recheckPending();
 }
 
-void Simulation::resolveAutomatically(std::unique_ptr<Event> event, int replacesId) {
-    std::vector<Conflict> conflicts = checker_.check(*event, replacesId);
+void Simulation::resolveAutomatically(std::unique_ptr<Event> event, int replacesId,
+                                      std::vector<Conflict> conflicts) {
     // Несколько попыток: после одного исправления может остаться другой конфликт.
     for (int attempt = 0; attempt < 5 && !conflicts.empty(); ++attempt) {
         std::vector<FixOption> options = resolver_.suggest(*event, conflicts, now_, replacesId);

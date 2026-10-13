@@ -96,7 +96,8 @@ private:
     void sendReminders();
     // Обработка заявки: без конфликтов — в календарь, иначе авто-решение или ожидание.
     void handleRequest(std::unique_ptr<Event> event, int replacesId, bool autoResolve);
-    void resolveAutomatically(std::unique_ptr<Event> event, int replacesId);
+    void resolveAutomatically(std::unique_ptr<Event> event, int replacesId,
+                              std::vector<Conflict> conflicts);
     void recheckPending();
     void commit(std::unique_ptr<Event> event, int replacesId);
     void addLog(const std::string& text);
