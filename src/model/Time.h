@@ -5,8 +5,7 @@
 
 namespace sec {
 
-// Модельное время: минуты от 00:00 первого дня периода моделирования.
-// Например, 1 * 1440 + 14 * 60 = 2280 — это второй день, 14:00.
+// время в минутах от начала первого дня
 using Minutes = int;
 
 constexpr Minutes kMinutesPerHour = 60;
@@ -16,35 +15,33 @@ inline int dayOf(Minutes t) { return t / kMinutesPerDay; }
 inline Minutes minuteOfDay(Minutes t) { return t % kMinutesPerDay; }
 inline Minutes dayStart(int day) { return day * kMinutesPerDay; }
 
-// Перевод модельного времени в календарные даты и строки для вывода.
 class Clock {
 public:
     explicit Clock(std::chrono::year_month_day start = std::chrono::year_month_day{
                        std::chrono::year{2026}, std::chrono::month{10}, std::chrono::day{5}});
 
-    int weekdayOf(int day) const;  // 0 = понедельник ... 6 = воскресенье
+    int weekdayOf(int day) const;  // 0 - пн, 6 - вс
     bool isWeekend(int day) const { return weekdayOf(day) >= 5; }
 
-    std::string dayString(int day) const;     // "Пн 05.10"
-    std::string timeString(Minutes t) const;  // "Пн 05.10 14:30"
-    static std::string hhmm(Minutes t);       // "14:30"
+    std::string dayString(int day) const;
+    std::string timeString(Minutes t) const;
+    static std::string hhmm(Minutes t);
 
 private:
     std::chrono::sys_days start_;
 };
 
-// Рабочий график фирмы на период моделирования.
 struct WorkSchedule {
     Clock clock;
     Minutes workStart = 9 * kMinutesPerHour;
     Minutes workEnd = 18 * kMinutesPerHour;
-    int days = 14;  // длина периода моделирования
+    int days = 14;
 
     Minutes workdayLength() const { return workEnd - workStart; }
     Minutes periodEnd() const { return dayStart(days - 1) + workEnd; }
     bool isWorkingDay(int day) const { return day >= 0 && day < days && !clock.isWeekend(day); }
-    // Длительность командировки на n дней: с начала первого до конца последнего рабочего дня.
+    // командировка с утра первого дня до вечера последнего
     Minutes tripDuration(int n) const { return (n - 1) * kMinutesPerDay + workdayLength(); }
 };
 
-}  // namespace sec
+}

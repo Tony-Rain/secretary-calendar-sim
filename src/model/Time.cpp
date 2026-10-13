@@ -4,15 +4,14 @@ namespace sec {
 
 Clock::Clock(std::chrono::year_month_day start) : start_(std::chrono::sys_days{start}) {}
 
-// Число двумя цифрами: 5 -> "05".
 static std::string twoDigits(int n) {
     if (n < 10) return "0" + std::to_string(n);
     return std::to_string(n);
 }
 
 int Clock::weekdayOf(int day) const {
-    std::chrono::weekday wd{start_ + std::chrono::days{day}};  // дата дня с номером day
-    int iso = wd.iso_encoding();                                // 1 = Пн ... 7 = Вс
+    std::chrono::weekday wd{start_ + std::chrono::days{day}};
+    int iso = wd.iso_encoding();
     return iso - 1;
 }
 
@@ -33,4 +32,4 @@ std::string Clock::timeString(Minutes t) const {
     return dayString(dayOf(t)) + " " + hhmm(t);
 }
 
-}  // namespace sec
+}

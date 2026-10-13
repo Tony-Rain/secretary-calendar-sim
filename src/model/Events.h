@@ -15,7 +15,6 @@ const char* importanceName(Importance imp);
 enum class EventKind { DailyMeeting, ManagersMeeting, Seminar, WorkMeeting, BusinessTrip };
 const char* eventKindName(EventKind kind);
 
-// Календарное событие фирмы (абстрактный базовый класс).
 class Event {
 public:
     Event(const std::string& title, Minutes start, Minutes duration, Room* room,
@@ -23,12 +22,9 @@ public:
     virtual ~Event() = default;
 
     virtual EventKind kind() const = 0;
-    // Копия события (нужна, чтобы примерить изменения, не трогая оригинал).
-    // Виртуальная, потому что копировать надо объект настоящего класса (Seminar, BusinessTrip...).
     virtual std::unique_ptr<Event> clone() const = 0;
-    // Можно ли пропустить событие ради другого без конфликта (планёрка).
+    // планерку можно пропустить, это не конфликт
     virtual bool allowsAbsence() const { return false; }
-    // Отдел, к которому относится событие (для фильтра и цвета); nullptr — общее.
     virtual const Department* ownerDepartment() const;
 
     int id() const { return id_; }
@@ -49,12 +45,10 @@ public:
     void setParticipants(const std::vector<Employee*>& people) { participants_ = people; }
     void removeParticipant(const Employee* e);
 
-    // Пересекаются ли события по времени: одно начинается раньше, чем кончается другое, и наоборот.
     bool overlaps(const Event& other) const { return start_ < other.end() && other.start() < end(); }
     bool hasParticipant(const Employee* e) const;
     bool involves(const Department* d) const;
 
-    // Учёт отправленных напоминаний.
     int remindersSent() const { return remindersSent_; }
     Minutes lastReminder() const { return lastReminder_; }
     void markReminded(Minutes t) { ++remindersSent_; lastReminder_ = t; }
@@ -64,14 +58,13 @@ private:
     std::string title_;
     Minutes start_;
     Minutes duration_;
-    Room* room_;  // nullptr — событие вне фирмы (командировка)
+    Room* room_;  // nullptr у командировки
     Importance importance_;
     std::vector<Employee*> participants_;
     int remindersSent_ = 0;
     Minutes lastReminder_ = -1;
 };
 
-// Ежедневная планёрка отдела.
 class DailyMeeting : public Event {
 public:
     DailyMeeting(const std::string& title, Minutes start, Minutes duration, Room* room,
@@ -85,7 +78,6 @@ private:
     Department* department_;
 };
 
-// Совещание руководителей отделов.
 class ManagersMeeting : public Event {
 public:
     ManagersMeeting(const std::string& title, Minutes start, Minutes duration, Room* room,
@@ -96,7 +88,6 @@ public:
     const Department* ownerDepartment() const override { return nullptr; }
 };
 
-// Тематический семинар (участники из разных отделов).
 class Seminar : public Event {
 public:
     Seminar(const std::string& title, Minutes start, Minutes duration, Room* room,
@@ -106,7 +97,6 @@ public:
     std::unique_ptr<Event> clone() const override { return std::make_unique<Seminar>(*this); }
 };
 
-// Рабочее совещание группы сотрудников.
 class WorkMeeting : public Event {
 public:
     WorkMeeting(const std::string& title, Minutes start, Minutes duration, Room* room,
@@ -116,7 +106,6 @@ public:
     std::unique_ptr<Event> clone() const override { return std::make_unique<WorkMeeting>(*this); }
 };
 
-// Командировка: проходит вне фирмы (без помещения), может длиться несколько дней.
 class BusinessTrip : public Event {
 public:
     BusinessTrip(const std::string& title, Minutes start, Minutes duration, Importance importance)
@@ -125,4 +114,4 @@ public:
     std::unique_ptr<Event> clone() const override { return std::make_unique<BusinessTrip>(*this); }
 };
 
-}  // namespace sec
+}

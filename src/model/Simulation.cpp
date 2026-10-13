@@ -29,7 +29,7 @@ Simulation::Simulation(const SimulationParams& params)
            std::to_string(calendar_.events().size()));
 }
 
-// Ближайший рабочий момент не раньше t (ночи и выходные пропускаются).
+// пропускаем ночь и выходные
 Minutes Simulation::nextWorkingTime(Minutes t) const {
     while (t < schedule_.periodEnd()) {
         int day = dayOf(t);
@@ -50,17 +50,14 @@ void Simulation::step() {
     now_ = nextWorkingTime(now_ + params_.step);
     ++stepNumber_;
 
-    // 1. Убираем прошедшие события.
     removeFinished();
     if (finished()) {
         addLog("Моделирование завершено");
         return;
     }
 
-    // 2. Рассылаем напоминания.
     sendReminders();
 
-    // 3. Возможно, поступила новая заявка.
     if (generator_.requestArrives(params_.requestsPerDay, params_.step)) {
         std::unique_ptr<Event> event = generator_.randomRequest(now_);
         if (event) {
@@ -92,7 +89,7 @@ void Simulation::sendReminders() {
 
 void Simulation::submit(std::unique_ptr<Event> event, int replacesId) {
     ++stats_.requests;
-    handleRequest(std::move(event), replacesId, false);  // пользователь всегда решает сам
+    handleRequest(std::move(event), replacesId, false);  // ручное добавление - всегда через диалог
 }
 
 void Simulation::handleRequest(std::unique_ptr<Event> event, int replacesId, bool autoResolve) {
@@ -117,7 +114,7 @@ void Simulation::handleRequest(std::unique_ptr<Event> event, int replacesId, boo
 
 void Simulation::resolveAutomatically(std::unique_ptr<Event> event, int replacesId,
                                       std::vector<Conflict> conflicts) {
-    // Несколько попыток: после одного исправления может остаться другой конфликт.
+    // после одного исправления может вылезти другой конфликт
     for (int attempt = 0; attempt < 5 && !conflicts.empty(); ++attempt) {
         std::vector<FixOption> options = resolver_.suggest(*event, conflicts, now_, replacesId);
         int i = resolver_.chooseAuto(options, isAdmin());
@@ -135,7 +132,6 @@ void Simulation::resolveAutomatically(std::unique_ptr<Event> event, int replaces
     }
 }
 
-// Пересчитать конфликты ожидающей заявки; если их нет — внести её в календарь.
 void Simulation::recheckPending() {
     pending_->conflicts = checker_.check(*pending_->event, pending_->replacesId);
     if (pending_->conflicts.empty()) {
@@ -198,4 +194,4 @@ void Simulation::addLog(const std::string& text) {
     log_.push_back(LogEntry{now_, text});
 }
 
-}  // namespace sec
+}

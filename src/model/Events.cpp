@@ -27,7 +27,6 @@ Event::Event(const std::string& title, Minutes start, Minutes duration, Room* ro
     : title_(title), start_(start), duration_(duration), room_(room),
       importance_(importance) {}
 
-// Если все участники из одного отдела — событие относится к этому отделу.
 const Department* Event::ownerDepartment() const {
     if (participants_.empty()) return nullptr;
     const Department* d = participants_[0]->department();
@@ -62,4 +61,4 @@ DailyMeeting::DailyMeeting(const std::string& title, Minutes start, Minutes dura
                            Importance importance, Department* department)
     : Event(title, start, duration, room, importance), department_(department) {}
 
-}  // namespace sec
+}

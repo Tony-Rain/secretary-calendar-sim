@@ -7,14 +7,13 @@ Notifier::Notifier(const ReminderRule rules[3]) {
 }
 
 bool Notifier::isTimeToRemind(const Event& e, Minutes now) const {
-    // Правило берём по важности: Low = 0, Medium = 1, High = 2.
     int index = static_cast<int>(e.importance());
     const ReminderRule& rule = rules_[index];
     Minutes left = e.start() - now;
-    if (left <= 0 || left > rule.daysBefore * kMinutesPerDay) return false;  // ещё рано или уже поздно
+    if (left <= 0 || left > rule.daysBefore * kMinutesPerDay) return false;
 
-    if (e.remindersSent() == 0) return true;  // первое напоминание
-    if (rule.everyHours == 0) return false;   // напоминать только один раз
+    if (e.remindersSent() == 0) return true;
+    if (rule.everyHours == 0) return false;
     return now - e.lastReminder() >= rule.everyHours * kMinutesPerHour;
 }
 
@@ -29,4 +28,4 @@ std::vector<Message> Notifier::process(Calendar& calendar, Minutes now) {
     return sent;
 }
 
-}  // namespace sec
+}

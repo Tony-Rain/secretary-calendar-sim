@@ -40,14 +40,12 @@ static const std::vector<std::string> kSurnames = {
 static const std::vector<std::string> kInitials = {"А", "Б", "В", "Г", "Д", "Е", "И", "К", "Л", "М",
                            "Н", "О", "П", "Р", "С", "Т", "Ф", "Ю", "Я"};
 
-// Случайный элемент списка.
 static std::string pick(const std::vector<std::string>& items, std::mt19937& rng) {
     int last = items.size() - 1;
-    std::uniform_int_distribution<int> dist(0, last);  // равномерно от 0 до last
+    std::uniform_int_distribution<int> dist(0, last);
     return items[dist(rng)];
 }
 
-// Случайное ФИО вида "Петров А.С.", не совпадающее с уже выданными.
 static std::string uniqueName(std::set<std::string>& used, std::mt19937& rng) {
     while (true) {
         std::string name = pick(kSurnames, rng) + " " + pick(kInitials, rng) + "." +
@@ -77,7 +75,6 @@ std::unique_ptr<Company> Company::generate(int departments, int staffPerDepartme
         dept->setRoom(room.get());
         company->rooms_.push_back(std::move(room));
 
-        // Сначала руководитель, потом сотрудники.
         for (int i = 0; i <= staffPerDepartment; ++i) {
             int id = nextPersonId++;
             std::string name = uniqueName(usedNames, rng);
@@ -115,4 +112,4 @@ Employee* Company::findEmployee(int id) const {
     return nullptr;
 }
 
-}  // namespace sec
+}

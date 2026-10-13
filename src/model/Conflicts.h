@@ -7,27 +7,24 @@
 
 namespace sec {
 
-// Виды конфликтов.
 enum class ConflictKind {
-    PersonBusy,    // сотрудник в это время уже участвует в другом событии
-    RoomBusy,      // помещение в это время занято
-    RoomTooSmall,  // участников больше, чем мест в помещении
+    PersonBusy,
+    RoomBusy,
+    RoomTooSmall,
 };
 
 struct Conflict {
     ConflictKind kind = ConflictKind::PersonBusy;
-    const Event* other = nullptr;      // событие, с которым конфликт
-    Employee* person = nullptr;        // занятый сотрудник (для PersonBusy)
-    std::string text;                  // описание для пользователя
+    const Event* other = nullptr;
+    Employee* person = nullptr;
+    std::string text;
 };
 
-// Проверка события на конфликты с календарём.
 class ConflictChecker {
 public:
     ConflictChecker(const Calendar& calendar, const WorkSchedule& schedule)
         : calendar_(calendar), schedule_(schedule) {}
 
-    // skipId — id события, которое не учитывать (когда изменяем уже существующее).
     std::vector<Conflict> check(const Event& event, int skipId = 0) const;
 
 private:
@@ -35,25 +32,23 @@ private:
     const WorkSchedule& schedule_;
 };
 
-// Способы разрешения конфликта.
 enum class FixType {
-    MoveNew,       // перенести новое событие на свободное время
-    ChangeRoom,    // провести новое событие в другом помещении
-    RemovePeople,  // не приглашать занятых сотрудников
-    MoveOld,       // перенести уже назначенное событие (только админ)
+    MoveNew,
+    ChangeRoom,
+    RemovePeople,
+    MoveOld,
 };
 
 struct FixOption {
     FixType type = FixType::MoveNew;
-    std::string text;        // описание для пользователя
-    bool adminOnly = false;  // меняет уже назначенное событие
-    Minutes newStart = 0;    // для MoveNew и MoveOld
+    std::string text;
+    bool adminOnly = false;
+    Minutes newStart = 0;
     Room* newRoom = nullptr; // для ChangeRoom
-    std::vector<Employee*> people;  // для RemovePeople
-    int oldEventId = 0;      // для MoveOld
+    std::vector<Employee*> people;
+    int oldEventId = 0;
 };
 
-// Подбор и применение способов разрешения конфликтов.
 class ConflictResolver {
 public:
     ConflictResolver(Calendar& calendar, const Company& company, const WorkSchedule& schedule)
@@ -64,12 +59,9 @@ public:
                                    Minutes now, int skipId = 0) const;
     void apply(const FixOption& option, Event& newEvent);
 
-    // Для автоматического режима: номер первого разрешённого варианта или -1.
     int chooseAuto(const std::vector<FixOption>& options, bool isAdmin) const;
 
-    // Ближайшее время не раньше from, когда событие проходит без конфликтов
-    // (в рабочие часы и в пределах периода). avoid — событие, с которым нельзя
-    // пересекаться по времени. Возвращает -1, если такого времени нет.
+    // -1 если не нашли
     Minutes findFreeTime(const Event& event, Minutes from, int skipId,
                          const Event* avoid = nullptr) const;
 
@@ -82,4 +74,4 @@ private:
     ConflictChecker checker_;
 };
 
-}  // namespace sec
+}

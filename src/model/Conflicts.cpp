@@ -4,34 +4,28 @@
 
 namespace sec {
 
-// Есть ли сотрудник p в списке.
 static bool containsPerson(const std::vector<Employee*>& list, Employee* p) {
     for (Employee* item : list)
         if (item == p) return true;
     return false;
 }
 
-// Есть ли событие e в списке.
 static bool containsEvent(const std::vector<const Event*>& list, const Event* e) {
     for (const Event* item : list)
         if (item == e) return true;
     return false;
 }
 
-const Minutes kSlot = 30;  // время подбирается с шагом в полчаса
+const Minutes kSlot = 30;
 
-// "«Семинар» (Ср 07.10 14:00)"
 static std::string eventLabel(const Event& e, const Clock& clock) {
     return "«" + e.title() + "» (" + clock.timeString(e.start()) + ")";
 }
-
-// ---------- ConflictChecker ----------
 
 std::vector<Conflict> ConflictChecker::check(const Event& event, int skipId) const {
     std::vector<Conflict> result;
     const Clock& clock = schedule_.clock;
 
-    // 1. Хватает ли мест в помещении.
     Room* room = event.room();
     int count = event.participants().size();
     if (room && count > room->capacity()) {
@@ -42,7 +36,6 @@ std::vector<Conflict> ConflictChecker::check(const Event& event, int skipId) con
         result.push_back(c);
     }
 
-    // 2. Пересечения с другими событиями календаря.
     for (const std::unique_ptr<Event>& other : calendar_.events()) {
         if (other->id() == skipId || !event.overlaps(*other)) continue;
 
@@ -54,7 +47,7 @@ std::vector<Conflict> ConflictChecker::check(const Event& event, int skipId) con
             result.push_back(c);
         }
 
-        // Планёрку можно пропустить — это не конфликт.
+        // планерки не считаем
         if (event.allowsAbsence() || other->allowsAbsence()) continue;
 
         for (Employee* p : event.participants()) {
@@ -71,15 +64,12 @@ std::vector<Conflict> ConflictChecker::check(const Event& event, int skipId) con
     return result;
 }
 
-// ---------- ConflictResolver ----------
-
 std::vector<FixOption> ConflictResolver::suggest(const Event& newEvent,
                                                  const std::vector<Conflict>& conflicts,
                                                  Minutes now, int skipId) const {
     std::vector<FixOption> options;
     const Clock& clock = schedule_.clock;
 
-    // Какие проблемы есть.
     bool roomProblem = false;
     std::vector<Employee*> busyPeople;
     std::vector<const Event*> otherEvents;
@@ -90,7 +80,6 @@ std::vector<FixOption> ConflictResolver::suggest(const Event& newEvent,
         if (c.other && !containsEvent(otherEvents, c.other)) otherEvents.push_back(c.other);
     }
 
-    // 1. Перенести новое событие: сначала ищем позже, потом с текущего момента.
     Minutes t = findFreeTime(newEvent, std::max(newEvent.start(), now), skipId);
     if (t < 0) t = findFreeTime(newEvent, now, skipId);
     if (t >= 0) {
@@ -101,7 +90,6 @@ std::vector<FixOption> ConflictResolver::suggest(const Event& newEvent,
         options.push_back(o);
     }
 
-    // 2. Другое помещение (не больше двух вариантов).
     if (roomProblem && newEvent.room()) {
         int found = 0;
         for (const std::unique_ptr<Room>& room : company_.rooms()) {
@@ -123,7 +111,6 @@ std::vector<FixOption> ConflictResolver::suggest(const Event& newEvent,
         }
     }
 
-    // 3. Не приглашать занятых (если кто-то останется).
     if (!busyPeople.empty() && busyPeople.size() < newEvent.participants().size()) {
         FixOption o;
         o.type = FixType::RemovePeople;
@@ -133,7 +120,6 @@ std::vector<FixOption> ConflictResolver::suggest(const Event& newEvent,
         options.push_back(o);
     }
 
-    // 4. Перенести уже назначенное событие (только админ, и только если оно ещё не началось).
     for (const Event* other : otherEvents) {
         if (other->start() <= now) continue;
         Minutes t2 = findFreeTime(*other, other->start(), other->id(), &newEvent);
@@ -185,9 +171,8 @@ Minutes ConflictResolver::findFreeTime(const Event& event, Minutes from, int ski
                                        const Event* avoid) const {
     std::unique_ptr<Event> copy = event.clone();
     Minutes t = from;
-    while (t % kSlot != 0) ++t;  // начинаем с ближайшего получаса (10:10 -> 10:30)
+    while (t % kSlot != 0) ++t;  // округляем до получаса
 
-    // Перебираем все получасовые моменты до конца периода.
     while (t + event.duration() <= schedule_.periodEnd()) {
         if (fitsWorkTime(event, t)) {
             copy->setStart(t);
@@ -200,4 +185,4 @@ Minutes ConflictResolver::findFreeTime(const Event& event, Minutes from, int ski
     return -1;
 }
 
-}  // namespace sec
+}

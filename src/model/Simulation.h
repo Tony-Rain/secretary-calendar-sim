@@ -12,70 +12,63 @@
 
 namespace sec {
 
-enum class ConflictMode { Manual, Auto };  // Manual — решает пользователь, Auto — система
+enum class ConflictMode { Manual, Auto };
 enum class UserRole { Admin, User };
 
-// Параметры моделирования (задаются в окне параметров).
 struct SimulationParams {
-    int departments = 6;          // K, 5..9
-    int staffPerDepartment = 6;   // сотрудников в отделе (без руководителя)
-    int days = 14;                // N, 7..30
-    Minutes step = 30;            // 30 или 60
+    int departments = 6;  // K
+    int staffPerDepartment = 6;
+    int days = 14;  // N
+    Minutes step = 30;
     std::chrono::year_month_day startDate{std::chrono::year{2026}, std::chrono::month{10},
                                           std::chrono::day{5}};
     Minutes workStart = 9 * 60, workEnd = 18 * 60;
-    double requestsPerDay = 3.0;  // среднее число случайных заявок в день
+    double requestsPerDay = 3.0;
     unsigned seed = 1;
-    ReminderRule reminders[3] = {{1, 0}, {2, 24}, {4, 24}};  // индекс = (int)Importance
+    ReminderRule reminders[3] = {{1, 0}, {2, 24}, {4, 24}};  // low, medium, high
     ConflictMode conflictMode = ConflictMode::Manual;
     UserRole role = UserRole::Admin;
 };
 
-// Запись журнала.
 struct LogEntry {
     Minutes time;
     std::string text;
 };
 
-// Итоговая статистика.
 struct Statistics {
-    int held = 0;          // состоялось событий
-    int cancelled = 0;     // отменено админом
-    int requests = 0;      // поступило заявок
-    int conflicts = 0;     // заявок с конфликтами
-    int rejected = 0;      // отклонено заявок
-    int reminders = 0;     // отправлено напоминаний
-    Minutes hallBusy = 0;  // сколько минут был занят конференц-зал
+    int held = 0;
+    int cancelled = 0;
+    int requests = 0;
+    int conflicts = 0;
+    int rejected = 0;
+    int reminders = 0;
+    Minutes hallBusy = 0;
 };
 
-// Заявка с конфликтом, ждущая решения пользователя.
 struct PendingRequest {
-    std::unique_ptr<Event> event;  // новое (или изменённое) событие
-    int replacesId = 0;            // id изменяемого события, 0 — новое
+    std::unique_ptr<Event> event;
+    int replacesId = 0;  // 0 - новое событие
     std::vector<Conflict> conflicts;
     std::vector<FixOption> options;
 };
 
-// Моделирование работы календаря фирмы во времени.
 class Simulation {
 public:
     explicit Simulation(const SimulationParams& params);
 
-    // Время
-    void step();  // один шаг; ничего не делает, если hasPending() или finished()
+    void step();
     bool finished() const { return now_ >= schedule_.periodEnd(); }
     Minutes now() const { return now_; }
     int stepNumber() const { return stepNumber_; }
     int totalSteps() const { return totalSteps_; }
 
-    // Добавление и изменение событий пользователем
     void submit(std::unique_ptr<Event> event, int replacesId = 0);
     bool hasPending() const { return pending_ != nullptr; }
     const PendingRequest& pending() const { return *pending_; }
     void choosePending(int optionIndex);
     void replacePending(std::unique_ptr<Event> edited);
     void rejectPending();
-    bool cancelEvent(int id);  // только админ
+    bool cancelEvent(int id);
 
     UserRole role() const { return role_; }
     void setRole(UserRole role) { role_ = role; }
@@ -94,7 +87,6 @@ private:
     Minutes nextWorkingTime(Minutes t) const;
     void removeFinished();
     void sendReminders();
-    // Обработка заявки: без конфликтов — в календарь, иначе авто-решение или ожидание.
     void handleRequest(std::unique_ptr<Event> event, int replacesId, bool autoResolve);
     void resolveAutomatically(std::unique_ptr<Event> event, int replacesId,
                               std::vector<Conflict> conflicts);
@@ -102,7 +94,7 @@ private:
     void commit(std::unique_ptr<Event> event, int replacesId);
     void addLog(const std::string& text);
 
-    // Порядок полей важен: они создаются в этом порядке.
+    // порядок полей важен (инициализация)
     SimulationParams params_;
     std::mt19937 rng_;
     WorkSchedule schedule_;
@@ -125,4 +117,4 @@ private:
     Statistics stats_;
 };
 
-}  // namespace sec
+}

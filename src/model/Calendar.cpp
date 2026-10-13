@@ -44,7 +44,7 @@ std::vector<std::unique_ptr<Event>> Calendar::removeFinished(Minutes now) {
         else
             rest.push_back(std::move(e));
     }
-    events_ = std::move(rest);  // в календаре остаются только будущие события
+    events_ = std::move(rest);
     return finished;
 }
 
@@ -71,4 +71,4 @@ void Calendar::markAbsences(Event& added) {
     }
 }
 
-}  // namespace sec
+}
