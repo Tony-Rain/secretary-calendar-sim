@@ -6,6 +6,7 @@
 namespace sec {
 
 // Модельное время: минуты от 00:00 первого дня периода моделирования.
+// Например, 1 * 1440 + 14 * 60 = 2280 — это второй день, 14:00.
 using Minutes = int;
 
 constexpr Minutes kMinutesPerHour = 60;

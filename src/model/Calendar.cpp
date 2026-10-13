@@ -30,7 +30,7 @@ std::unique_ptr<Event> Calendar::remove(int id) {
 }
 
 Event* Calendar::find(int id) const {
-    for (const auto& e : events_)
+    for (const std::unique_ptr<Event>& e : events_)
         if (e->id() == id) return e.get();
     return nullptr;
 }
@@ -38,13 +38,13 @@ Event* Calendar::find(int id) const {
 std::vector<std::unique_ptr<Event>> Calendar::removeFinished(Minutes now) {
     std::vector<std::unique_ptr<Event>> finished;
     std::vector<std::unique_ptr<Event>> rest;
-    for (auto& e : events_) {
+    for (std::unique_ptr<Event>& e : events_) {
         if (e->end() <= now)
             finished.push_back(std::move(e));
         else
             rest.push_back(std::move(e));
     }
-    events_ = std::move(rest);
+    events_ = std::move(rest);  // в календаре остаются только будущие события
     return finished;
 }
 
@@ -52,7 +52,7 @@ static bool byStart(const Event* a, const Event* b) { return a->start() < b->sta
 
 std::vector<Event*> Calendar::query(Minutes from, Minutes to, const EventFilter& filter) const {
     std::vector<Event*> result;
-    for (const auto& e : events_) {
+    for (const std::unique_ptr<Event>& e : events_) {
         bool inPeriod = e->start() < to && from < e->end();
         if (inPeriod && filter.matches(*e)) result.push_back(e.get());
     }
@@ -61,7 +61,7 @@ std::vector<Event*> Calendar::query(Minutes from, Minutes to, const EventFilter&
 }
 
 void Calendar::markAbsences(Event& added) {
-    for (auto& other : events_) {
+    for (std::unique_ptr<Event>& other : events_) {
         if (!other->overlaps(added)) continue;
         if (other->allowsAbsence() && !added.allowsAbsence()) {
             for (Employee* p : added.participants()) other->removeParticipant(p);

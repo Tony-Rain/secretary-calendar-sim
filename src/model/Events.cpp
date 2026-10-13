@@ -22,8 +22,9 @@ const char* eventKindName(EventKind kind) {
     return "";
 }
 
-Event::Event(std::string title, Minutes start, Minutes duration, Room* room, Importance importance)
-    : title_(std::move(title)), start_(start), duration_(duration), room_(room),
+Event::Event(const std::string& title, Minutes start, Minutes duration, Room* room,
+             Importance importance)
+    : title_(title), start_(start), duration_(duration), room_(room),
       importance_(importance) {}
 
 // Если все участники из одного отдела — событие относится к этому отделу.
@@ -57,8 +58,8 @@ bool Event::involves(const Department* d) const {
     return false;
 }
 
-DailyMeeting::DailyMeeting(std::string title, Minutes start, Minutes duration, Room* room,
+DailyMeeting::DailyMeeting(const std::string& title, Minutes start, Minutes duration, Room* room,
                            Importance importance, Department* department)
-    : Event(std::move(title), start, duration, room, importance), department_(department) {}
+    : Event(title, start, duration, room, importance), department_(department) {}
 
 }  // namespace sec

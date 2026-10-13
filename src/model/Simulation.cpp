@@ -73,7 +73,8 @@ void Simulation::step() {
 }
 
 void Simulation::removeFinished() {
-    for (auto& e : calendar_.removeFinished(now_)) {
+    std::vector<std::unique_ptr<Event>> finishedEvents = calendar_.removeFinished(now_);
+    for (std::unique_ptr<Event>& e : finishedEvents) {
         ++stats_.held;
         if (e->room() == company_->conferenceHall()) stats_.hallBusy += e->duration();
         addLog("Состоялось: «" + e->title() + "»");
@@ -85,7 +86,7 @@ void Simulation::sendReminders() {
     std::vector<Message> sent = notifier_.process(calendar_, now_);
     if (sent.empty()) return;
     for (const Message& m : sent) messages_.push_back(m);
-    stats_.reminders += static_cast<int>(sent.size());
+    stats_.reminders += sent.size();
     addLog("Отправлено напоминаний: " + std::to_string(sent.size()));
 }
 
@@ -147,8 +148,9 @@ void Simulation::recheckPending() {
 }
 
 void Simulation::choosePending(int optionIndex) {
-    if (!pending_ || optionIndex < 0 || optionIndex >= static_cast<int>(pending_->options.size()))
-        return;
+    if (!pending_) return;
+    int count = pending_->options.size();
+    if (optionIndex < 0 || optionIndex >= count) return;
     const FixOption& option = pending_->options[optionIndex];
     if (option.adminOnly && !isAdmin()) return;
 

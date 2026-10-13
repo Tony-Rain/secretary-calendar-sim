@@ -13,7 +13,7 @@ class Department;
 
 class Person {
 public:
-    Person(int id, std::string name, std::string email);
+    Person(int id, const std::string& name, const std::string& email);
     virtual ~Person() = default;
 
     int id() const { return id_; }
@@ -30,7 +30,7 @@ private:
 // Сотрудник фирмы, приписан к одному отделу.
 class Employee : public Person {
 public:
-    Employee(int id, std::string name, std::string email, Department* department);
+    Employee(int id, const std::string& name, const std::string& email, Department* department);
 
     Department* department() const { return department_; }
     virtual bool isHead() const { return false; }
@@ -43,7 +43,8 @@ private:
 // Руководитель отдела — участник совещаний руководителей.
 class DepartmentHead : public Employee {
 public:
-    using Employee::Employee;
+    DepartmentHead(int id, const std::string& name, const std::string& email, Department* department)
+        : Employee(id, name, email, department) {}
     bool isHead() const override { return true; }
     std::string position() const override { return "Руководитель отдела"; }
 };
@@ -52,7 +53,7 @@ public:
 
 class Room {
 public:
-    Room(int id, std::string name, int capacity);
+    Room(int id, const std::string& name, int capacity);
     virtual ~Room() = default;
 
     int id() const { return id_; }
@@ -69,14 +70,14 @@ private:
 // Помещение отдела.
 class DepartmentRoom : public Room {
 public:
-    using Room::Room;
+    DepartmentRoom(int id, const std::string& name, int capacity) : Room(id, name, capacity) {}
     bool isShared() const override { return false; }
 };
 
 // Общий конференц-зал фирмы.
 class ConferenceHall : public Room {
 public:
-    using Room::Room;
+    ConferenceHall(int id, const std::string& name, int capacity) : Room(id, name, capacity) {}
     bool isShared() const override { return true; }
 };
 
@@ -84,7 +85,7 @@ public:
 
 class Department {
 public:
-    Department(int id, std::string name);
+    Department(int id, const std::string& name);
 
     int id() const { return id_; }  // 0..K-1, используется и для цвета
     const std::string& name() const { return name_; }
@@ -94,6 +95,7 @@ public:
 
     void setRoom(DepartmentRoom* room) { room_ = room; }
     void setHead(DepartmentHead* head) { head_ = head; }
+    // Отдел становится владельцем сотрудника (std::move передаёт владение).
     void addEmployee(std::unique_ptr<Employee> e) { staff_.push_back(std::move(e)); }
 
 private:

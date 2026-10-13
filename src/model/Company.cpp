@@ -4,20 +4,21 @@
 
 namespace sec {
 
-Person::Person(int id, std::string name, std::string email)
-    : id_(id), name_(std::move(name)), email_(std::move(email)) {}
+Person::Person(int id, const std::string& name, const std::string& email)
+    : id_(id), name_(name), email_(email) {}
 
-Employee::Employee(int id, std::string name, std::string email, Department* department)
-    : Person(id, std::move(name), std::move(email)), department_(department) {}
+Employee::Employee(int id, const std::string& name, const std::string& email,
+                   Department* department)
+    : Person(id, name, email), department_(department) {}
 
-Room::Room(int id, std::string name, int capacity)
-    : id_(id), name_(std::move(name)), capacity_(capacity) {}
+Room::Room(int id, const std::string& name, int capacity)
+    : id_(id), name_(name), capacity_(capacity) {}
 
-Department::Department(int id, std::string name) : id_(id), name_(std::move(name)) {}
+Department::Department(int id, const std::string& name) : id_(id), name_(name) {}
 
 std::vector<Employee*> Department::staff() const {
     std::vector<Employee*> result;
-    for (const auto& e : staff_) result.push_back(e.get());
+    for (const std::unique_ptr<Employee>& e : staff_) result.push_back(e.get());
     return result;
 }
 
@@ -41,7 +42,8 @@ static const std::vector<std::string> kInitials = {"А", "Б", "В", "Г", "Д",
 
 // Случайный элемент списка.
 static std::string pick(const std::vector<std::string>& items, std::mt19937& rng) {
-    std::uniform_int_distribution<int> dist(0, static_cast<int>(items.size()) - 1);
+    int last = items.size() - 1;
+    std::uniform_int_distribution<int> dist(0, last);  // равномерно от 0 до last
     return items[dist(rng)];
 }
 
@@ -95,19 +97,19 @@ std::unique_ptr<Company> Company::generate(int departments, int staffPerDepartme
 
 std::vector<Employee*> Company::allEmployees() const {
     std::vector<Employee*> result;
-    for (const auto& d : departments_)
+    for (const std::unique_ptr<Department>& d : departments_)
         for (Employee* e : d->staff()) result.push_back(e);
     return result;
 }
 
 std::vector<Employee*> Company::heads() const {
     std::vector<Employee*> result;
-    for (const auto& d : departments_) result.push_back(d->head());
+    for (const std::unique_ptr<Department>& d : departments_) result.push_back(d->head());
     return result;
 }
 
 Employee* Company::findEmployee(int id) const {
-    for (const auto& d : departments_)
+    for (const std::unique_ptr<Department>& d : departments_)
         for (Employee* e : d->staff())
             if (e->id() == id) return e;
     return nullptr;

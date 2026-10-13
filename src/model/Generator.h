@@ -25,7 +25,8 @@ public:
     std::unique_ptr<Event> randomRequest(Minutes now);
 
 private:
-    int randomInt(int from, int to);  // включая обе границы
+    int randomInt(int from, int to);
+    int randomIndex(int size);
     Importance randomImportance();
     std::vector<Employee*> randomPeople(std::vector<Employee*> from, int count);
     Minutes randomStart(int day, Minutes duration);

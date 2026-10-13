@@ -14,9 +14,15 @@ static const std::vector<std::string> kCities = {
     "Санкт-Петербург", "Казань", "Новосибирск", "Екатеринбург", "Нижний Новгород", "Самара",
 };
 
+// Случайное целое от from до to включительно (равномерное распределение).
 int EventGenerator::randomInt(int from, int to) {
     std::uniform_int_distribution<int> dist(from, to);
     return dist(rng_);
+}
+
+// Случайный номер элемента в списке из size элементов.
+int EventGenerator::randomIndex(int size) {
+    return randomInt(0, size - 1);
 }
 
 // Низкая — 30%, средняя — 50%, высокая — 20%.
@@ -29,8 +35,9 @@ Importance EventGenerator::randomImportance() {
 
 // count случайных людей из списка (без повторов).
 std::vector<Employee*> EventGenerator::randomPeople(std::vector<Employee*> from, int count) {
-    std::shuffle(from.begin(), from.end(), rng_);
-    if (count < static_cast<int>(from.size())) from.resize(count);
+    std::shuffle(from.begin(), from.end(), rng_);  // перемешиваем список
+    int size = from.size();
+    if (count < size) from.resize(count);          // и берём первых count человек
     return from;
 }
 
@@ -44,8 +51,8 @@ std::unique_ptr<Event> EventGenerator::makeTrip(int day) {
     int daysLeft = schedule_.days - day;
     int n = randomInt(1, std::min(3, daysLeft));
     std::vector<Employee*> all = company_.allEmployees();
-    Employee* who = all[randomInt(0, static_cast<int>(all.size()) - 1)];
-    std::string city = kCities[randomInt(0, static_cast<int>(kCities.size()) - 1)];
+    Employee* who = all[randomIndex(all.size())];
+    std::string city = kCities[randomIndex(kCities.size())];
 
     auto trip = std::make_unique<BusinessTrip>("Командировка: " + who->name() + " → " + city,
                                                dayStart(day) + schedule_.workStart,
@@ -61,7 +68,7 @@ void EventGenerator::fillInitial(Calendar& calendar, const ConflictChecker& chec
         Minutes morning = dayStart(day) + schedule_.workStart;
 
         // Планёрка каждого отдела в начале дня.
-        for (const auto& dept : company_.departments()) {
+        for (const std::unique_ptr<Department>& dept : company_.departments()) {
             auto meeting = std::make_unique<DailyMeeting>("Планёрка: " + dept->name(), morning, 30,
                                                           dept->room(), Importance::Low, dept.get());
             meeting->setParticipants(dept->staff());
@@ -78,7 +85,7 @@ void EventGenerator::fillInitial(Calendar& calendar, const ConflictChecker& chec
         }
         // По средам — семинар для сотрудников разных отделов.
         if (weekday == 2) {
-            std::string topic = kTopics[randomInt(0, static_cast<int>(kTopics.size()) - 1)];
+            std::string topic = kTopics[randomIndex(kTopics.size())];
             auto seminar = std::make_unique<Seminar>("Семинар «" + topic + "»", morning + 5 * 60,
                                                      120, hall, Importance::Medium);
             seminar->setParticipants(randomPeople(company_.allEmployees(), randomInt(6, 12)));
@@ -99,6 +106,8 @@ void EventGenerator::fillInitial(Calendar& calendar, const ConflictChecker& chec
     }
 }
 
+// Вероятность заявки на шаге: p = (заявок в день) * (шаг) / (длина рабочего дня).
+// Например, 3 заявки в день, шаг 30 мин, день 540 мин: p = 3 * 30 / 540 = 1/6.
 bool EventGenerator::requestArrives(double perDay, Minutes step) {
     double probability = perDay * step / schedule_.workdayLength();
     std::uniform_real_distribution<double> dist(0.0, 1.0);
@@ -112,17 +121,17 @@ std::unique_ptr<Event> EventGenerator::randomRequest(Minutes now) {
     if (day >= schedule_.days) return nullptr;
 
     Room* hall = company_.conferenceHall();
-    std::string topic = kTopics[randomInt(0, static_cast<int>(kTopics.size()) - 1)];
+    std::string topic = kTopics[randomIndex(kTopics.size())];
     int roll = randomInt(1, 100);
 
     if (roll <= 45) {
         // Рабочее совещание: несколько человек одного отдела, иногда гость из другого.
-        const auto& depts = company_.departments();
-        Department* dept = depts[randomInt(0, static_cast<int>(depts.size()) - 1)].get();
+        const std::vector<std::unique_ptr<Department>>& depts = company_.departments();
+        Department* dept = depts[randomIndex(depts.size())].get();
         std::vector<Employee*> people = randomPeople(dept->staff(), randomInt(2, 5));
         Room* room = dept->room();
         if (randomInt(1, 100) <= 30) {
-            Department* guestDept = depts[randomInt(0, static_cast<int>(depts.size()) - 1)].get();
+            Department* guestDept = depts[randomIndex(depts.size())].get();
             Employee* guest = randomPeople(guestDept->staff(), 1)[0];
             if (guestDept != dept) {
                 people.push_back(guest);

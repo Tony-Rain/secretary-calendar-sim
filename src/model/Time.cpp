@@ -1,30 +1,32 @@
 #include "Time.h"
 
-#include <cstdio>
-
 namespace sec {
 
 Clock::Clock(std::chrono::year_month_day start) : start_(std::chrono::sys_days{start}) {}
 
+// Число двумя цифрами: 5 -> "05".
+static std::string twoDigits(int n) {
+    if (n < 10) return "0" + std::to_string(n);
+    return std::to_string(n);
+}
+
 int Clock::weekdayOf(int day) const {
-    std::chrono::weekday wd{start_ + std::chrono::days{day}};
-    return static_cast<int>(wd.iso_encoding()) - 1;  // iso: 1 = Пн ... 7 = Вс
+    std::chrono::weekday wd{start_ + std::chrono::days{day}};  // дата дня с номером day
+    int iso = wd.iso_encoding();                                // 1 = Пн ... 7 = Вс
+    return iso - 1;
 }
 
 std::string Clock::dayString(int day) const {
-    static const char* names[] = {"Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"};
-    std::chrono::year_month_day d{start_ + std::chrono::days{day}};
-    char buf[32];
-    std::snprintf(buf, sizeof buf, "%s %02u.%02u", names[weekdayOf(day)],
-                  static_cast<unsigned>(d.day()), static_cast<unsigned>(d.month()));
-    return buf;
+    const char* names[] = {"Пн", "Вт", "Ср", "Чт", "Пт", "Сб", "Вс"};
+    std::chrono::year_month_day date{start_ + std::chrono::days{day}};
+    int dayOfMonth = static_cast<unsigned>(date.day());
+    int month = static_cast<unsigned>(date.month());
+    return std::string(names[weekdayOf(day)]) + " " + twoDigits(dayOfMonth) + "." + twoDigits(month);
 }
 
 std::string Clock::hhmm(Minutes t) {
     Minutes m = minuteOfDay(t);
-    char buf[16];
-    std::snprintf(buf, sizeof buf, "%02d:%02d", m / 60, m % 60);
-    return buf;
+    return twoDigits(m / 60) + ":" + twoDigits(m % 60);
 }
 
 std::string Clock::timeString(Minutes t) const {

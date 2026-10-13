@@ -7,7 +7,9 @@ Notifier::Notifier(const ReminderRule rules[3]) {
 }
 
 bool Notifier::isTimeToRemind(const Event& e, Minutes now) const {
-    const ReminderRule& rule = rules_[static_cast<int>(e.importance())];
+    // Правило берём по важности: Low = 0, Medium = 1, High = 2.
+    int index = static_cast<int>(e.importance());
+    const ReminderRule& rule = rules_[index];
     Minutes left = e.start() - now;
     if (left <= 0 || left > rule.daysBefore * kMinutesPerDay) return false;  // ещё рано или уже поздно
 
@@ -18,7 +20,7 @@ bool Notifier::isTimeToRemind(const Event& e, Minutes now) const {
 
 std::vector<Message> Notifier::process(Calendar& calendar, Minutes now) {
     std::vector<Message> sent;
-    for (const auto& e : calendar.events()) {
+    for (const std::unique_ptr<Event>& e : calendar.events()) {
         if (!isTimeToRemind(*e, now)) continue;
         for (const Employee* p : e->participants())
             sent.push_back(Message{now, p, e->title(), e->start()});
