@@ -1,0 +1,20 @@
+cmake_minimum_required(VERSION 3.16)
+project(SecretaryCalendar CXX)
+
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
+
+# Модель (без Qt)
+file(GLOB MODEL_SOURCES src/model/*.cpp)
+add_library(secretary_model STATIC ${MODEL_SOURCES})
+target_include_directories(secretary_model PUBLIC src/model)
+
+# Интерфейс (Qt)
+if(EXISTS ${CMAKE_SOURCE_DIR}/src/main.cpp)
+    set(CMAKE_AUTOMOC ON)
+    find_package(Qt5 REQUIRED COMPONENTS Widgets)
+    file(GLOB GUI_SOURCES src/main.cpp src/gui/*.cpp)
+    add_executable(secretary ${GUI_SOURCES})
+    target_include_directories(secretary PRIVATE src/gui)
+    target_link_libraries(secretary secretary_model Qt5::Widgets)
+endif()
