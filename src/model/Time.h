@@ -34,4 +34,21 @@ private:
     std::chrono::sys_days start_;
 };
 
+// Рабочий график фирмы на период моделирования.
+struct WorkSchedule {
+    Clock clock;
+    Minutes workStart = 9 * kMinutesPerHour;
+    Minutes workEnd = 18 * kMinutesPerHour;
+    int days = 14;  // длина периода моделирования
+
+    Minutes workdayLength() const { return workEnd - workStart; }
+    Minutes periodEnd() const { return dayStart(days - 1) + workEnd; }
+    bool isWorkingDay(int day) const { return day >= 0 && day < days && !clock.isWeekend(day); }
+    bool isWorkingTime(Minutes t) const {
+        return isWorkingDay(dayOf(t)) && minuteOfDay(t) >= workStart && minuteOfDay(t) < workEnd;
+    }
+    // Длительность командировки на n дней: с начала первого до конца последнего рабочего дня.
+    Minutes tripDuration(int n) const { return (n - 1) * kMinutesPerDay + workdayLength(); }
+};
+
 }  // namespace sec

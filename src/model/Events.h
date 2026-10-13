@@ -22,11 +22,10 @@ public:
     virtual ~Event() = default;
 
     virtual EventKind kind() const = 0;
+    // Копия события (нужна, чтобы примерить изменения, не трогая оригинал).
     virtual std::unique_ptr<Event> clone() const = 0;
-    // Участник может пропустить событие ради другого — это не конфликт (планёрки).
+    // Можно ли пропустить событие ради другого без конфликта (планёрка).
     virtual bool allowsAbsence() const { return false; }
-    // Проходит ли событие в помещении фирмы.
-    virtual bool needsRoom() const { return true; }
     // Отдел, к которому относится событие (для фильтра и цвета); nullptr — общее.
     virtual const Department* ownerDepartment() const;
 
@@ -48,8 +47,8 @@ public:
     void setParticipants(std::vector<Employee*> people) { participants_ = std::move(people); }
     void removeParticipant(const Employee* e);
 
-    bool overlaps(Minutes from, Minutes to) const { return start_ < to && from < end(); }
-    bool overlaps(const Event& other) const { return overlaps(other.start(), other.end()); }
+    // Пересекаются ли события по времени.
+    bool overlaps(const Event& other) const { return start_ < other.end() && other.start() < end(); }
     bool hasParticipant(const Employee* e) const;
     bool involves(const Department* d) const;
 
@@ -63,29 +62,20 @@ private:
     std::string title_;
     Minutes start_;
     Minutes duration_;
-    Room* room_;
+    Room* room_;  // nullptr — событие вне фирмы (командировка)
     Importance importance_;
     std::vector<Employee*> participants_;
     int remindersSent_ = 0;
     Minutes lastReminder_ = -1;
 };
 
-// Шаблон для однотипной реализации kind() и clone() в наследниках.
-template <typename Derived, EventKind K>
-class EventOf : public Event {
-public:
-    using Event::Event;
-    EventKind kind() const override { return K; }
-    std::unique_ptr<Event> clone() const override {
-        return std::make_unique<Derived>(static_cast<const Derived&>(*this));
-    }
-};
-
 // Ежедневная планёрка отдела.
-class DailyMeeting : public EventOf<DailyMeeting, EventKind::DailyMeeting> {
+class DailyMeeting : public Event {
 public:
     DailyMeeting(std::string title, Minutes start, Minutes duration, Room* room,
                  Importance importance, Department* department);
+    EventKind kind() const override { return EventKind::DailyMeeting; }
+    std::unique_ptr<Event> clone() const override { return std::make_unique<DailyMeeting>(*this); }
     bool allowsAbsence() const override { return true; }
     const Department* ownerDepartment() const override { return department_; }
 
@@ -94,34 +84,37 @@ private:
 };
 
 // Совещание руководителей отделов.
-class ManagersMeeting : public EventOf<ManagersMeeting, EventKind::ManagersMeeting> {
+class ManagersMeeting : public Event {
 public:
-    using EventOf::EventOf;
+    using Event::Event;
+    EventKind kind() const override { return EventKind::ManagersMeeting; }
+    std::unique_ptr<Event> clone() const override { return std::make_unique<ManagersMeeting>(*this); }
     const Department* ownerDepartment() const override { return nullptr; }
 };
 
 // Тематический семинар (участники из разных отделов).
-class Seminar : public EventOf<Seminar, EventKind::Seminar> {
+class Seminar : public Event {
 public:
-    using EventOf::EventOf;
+    using Event::Event;
+    EventKind kind() const override { return EventKind::Seminar; }
+    std::unique_ptr<Event> clone() const override { return std::make_unique<Seminar>(*this); }
 };
 
 // Рабочее совещание группы сотрудников.
-class WorkMeeting : public EventOf<WorkMeeting, EventKind::WorkMeeting> {
+class WorkMeeting : public Event {
 public:
-    using EventOf::EventOf;
+    using Event::Event;
+    EventKind kind() const override { return EventKind::WorkMeeting; }
+    std::unique_ptr<Event> clone() const override { return std::make_unique<WorkMeeting>(*this); }
 };
 
-// Командировка: проходит вне фирмы, может длиться несколько дней.
-class BusinessTrip : public EventOf<BusinessTrip, EventKind::BusinessTrip> {
+// Командировка: проходит вне фирмы (без помещения), может длиться несколько дней.
+class BusinessTrip : public Event {
 public:
-    using EventOf::EventOf;
-    bool needsRoom() const override { return false; }
+    BusinessTrip(std::string title, Minutes start, Minutes duration, Importance importance)
+        : Event(std::move(title), start, duration, nullptr, importance) {}
+    EventKind kind() const override { return EventKind::BusinessTrip; }
+    std::unique_ptr<Event> clone() const override { return std::make_unique<BusinessTrip>(*this); }
 };
-
-// Создание события нужного вида (для диалога добавления).
-std::unique_ptr<Event> makeEvent(EventKind kind, std::string title, Minutes start,
-                                 Minutes duration, Room* room, Importance importance,
-                                 Department* department = nullptr);
 
 }  // namespace sec

@@ -33,12 +33,12 @@ Employee* Department::addEmployee(std::unique_ptr<Employee> e) {
 
 namespace {
 
-const char* kDepartmentNames[] = {
+const std::vector<std::string> kDepartmentNames = {
     "Бухгалтерия", "Отдел кадров", "Отдел продаж",      "Маркетинг",   "IT-отдел",
     "Юридический отдел", "Логистика", "Отдел закупок", "Аналитический отдел",
 };
 
-const char* kSurnames[] = {
+const std::vector<std::string> kSurnames = {
     "Иванов",   "Петров",   "Сидоров",  "Смирнов",   "Кузнецов", "Попов",    "Васильев",
     "Соколов",  "Михайлов", "Новиков",  "Фёдоров",   "Морозов",  "Волков",   "Алексеев",
     "Лебедев",  "Семёнов",  "Егоров",   "Павлов",    "Козлов",   "Степанов", "Николаев",
@@ -48,15 +48,28 @@ const char* kSurnames[] = {
     "Максимов", "Поляков",  "Сорокин",  "Виноградов", "Ковалёв", "Белов",    "Медведев",
 };
 
-const char* kInitials[] = {"А", "Б", "В", "Г", "Д", "Е", "И", "К", "Л", "М",
+const std::vector<std::string> kInitials = {"А", "Б", "В", "Г", "Д", "Е", "И", "К", "Л", "М",
                            "Н", "О", "П", "Р", "С", "Т", "Ф", "Ю", "Я"};
 
-template <typename T, size_t N>
-const T& pick(const T (&arr)[N], std::mt19937& rng) {
-    return arr[std::uniform_int_distribution<size_t>(0, N - 1)(rng)];
+// Случайный элемент списка.
+std::string pick(const std::vector<std::string>& items, std::mt19937& rng) {
+    std::uniform_int_distribution<int> dist(0, static_cast<int>(items.size()) - 1);
+    return items[dist(rng)];
 }
 
 }  // namespace
+
+// Случайное ФИО вида "Петров А.С.", не совпадающее с уже выданными.
+static std::string uniqueName(std::set<std::string>& used, std::mt19937& rng) {
+    while (true) {
+        std::string name = pick(kSurnames, rng) + " " + pick(kInitials, rng) + "." +
+                           pick(kInitials, rng) + ".";
+        if (used.count(name) == 0) {
+            used.insert(name);
+            return name;
+        }
+    }
+}
 
 std::unique_ptr<Company> Company::generate(int departments, int staffPerDepartment,
                                            std::mt19937& rng) {
@@ -65,21 +78,12 @@ std::unique_ptr<Company> Company::generate(int departments, int staffPerDepartme
     int nextPersonId = 1;
     int nextRoomId = 1;
 
-    auto uniqueName = [&]() {
-        std::string name;
-        do {
-            name = std::string(pick(kSurnames, rng)) + " " + pick(kInitials, rng) + "." +
-                   pick(kInitials, rng) + ".";
-        } while (!usedNames.insert(name).second);
-        return name;
-    };
-
     auto hall = std::make_unique<ConferenceHall>(nextRoomId++, "Конференц-зал", 40);
     company->hall_ = hall.get();
     company->rooms_.push_back(std::move(hall));
 
     for (int d = 0; d < departments; ++d) {
-        auto dept = std::make_unique<Department>(d, kDepartmentNames[d % 9]);
+        auto dept = std::make_unique<Department>(d, kDepartmentNames[d % kDepartmentNames.size()]);
         auto room = std::make_unique<DepartmentRoom>(
             nextRoomId++, "Каб. " + std::to_string(101 + d * 100), staffPerDepartment + 3,
             dept.get());
@@ -91,9 +95,9 @@ std::unique_ptr<Company> Company::generate(int departments, int staffPerDepartme
             std::string email = "emp" + std::to_string(id) + "@firm.local";
             std::unique_ptr<Employee> e;
             if (i == 0)
-                e = std::make_unique<DepartmentHead>(id, uniqueName(), email, dept.get());
+                e = std::make_unique<DepartmentHead>(id, uniqueName(usedNames, rng), email, dept.get());
             else
-                e = std::make_unique<Employee>(id, uniqueName(), email, dept.get());
+                e = std::make_unique<Employee>(id, uniqueName(usedNames, rng), email, dept.get());
             dept->addEmployee(std::move(e));
         }
         company->departments_.push_back(std::move(dept));

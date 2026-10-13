@@ -7,7 +7,7 @@
 
 namespace sec {
 
-// Критерий просмотра: вся фирма, отдел или конкретный сотрудник.
+// Что показывать: вся фирма (оба поля пустые), отдел или конкретный сотрудник.
 struct EventFilter {
     const Department* department = nullptr;
     const Employee* employee = nullptr;
@@ -20,21 +20,21 @@ class Calendar {
 public:
     // Добавляет событие; если у него нет id, присваивает новый. Возвращает id.
     int add(std::unique_ptr<Event> event);
+    // Убирает событие из календаря и отдаёт его вызывающему.
     std::unique_ptr<Event> remove(int id);
     Event* find(int id) const;
 
-    // Изымает из календаря завершившиеся к моменту now события.
-    std::vector<std::unique_ptr<Event>> extractFinished(Minutes now);
+    // Убирает из календаря события, закончившиеся к моменту now, и возвращает их.
+    std::vector<std::unique_ptr<Event>> removeFinished(Minutes now);
 
-    // События, пересекающие интервал [from, to), отсортированные по началу.
+    // События, идущие в промежутке [from, to) и подходящие под фильтр, по времени начала.
     std::vector<Event*> query(Minutes from, Minutes to, const EventFilter& filter = {}) const;
 
     const std::vector<std::unique_ptr<Event>>& events() const { return events_; }
-    size_t size() const { return events_.size(); }
 
 private:
-    // Участник события, допускающего отсутствие, исключается из него,
-    // если в это время у него другое (обязательное) событие.
+    // Если новое событие пересекается с планёркой, его участники
+    // просто пропускают планёрку (убираются из её участников).
     void markAbsences(Event& added);
 
     std::vector<std::unique_ptr<Event>> events_;
