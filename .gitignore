@@ -3,3 +3,7 @@ build/
 .vscode/
 .idea/
 CMakeLists.txt.user
+*.aux
+*.log
+*.toc
+*.out

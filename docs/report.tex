@@ -1,0 +1,490 @@
+% Отчёт по практикуму. Сборка: pdflatex report.tex (дважды — для оглавления)
+\documentclass[12pt,a4paper]{article}
+
+\usepackage[utf8]{inputenc}
+\usepackage[T2A]{fontenc}
+\usepackage[russian]{babel}
+\usepackage[left=25mm,right=15mm,top=20mm,bottom=20mm]{geometry}
+\usepackage{indentfirst}
+\usepackage{fancyvrb}
+\usepackage{booktabs}
+\usepackage{float}
+\usepackage{tikz}
+\usetikzlibrary{arrows.meta,positioning}
+\usepackage[hidelinks]{hyperref}
+
+\fvset{fontsize=\small,frame=single,framesep=2mm}
+
+% Обозначения для диаграмм
+\tikzset{
+  cls/.style={draw,rectangle,minimum width=2.9cm,minimum height=0.8cm,
+              font=\small\ttfamily,align=center,fill=white},
+  obj/.style={draw,rounded corners=7pt,minimum width=2.9cm,minimum height=0.8cm,
+              font=\small\ttfamily,align=center,fill=white},
+  inh/.style={-{Triangle[open,length=8pt,width=8pt]}},
+  agg/.style={{Diamond[open,length=10pt,width=6pt]}-},
+  comp/.style={{Diamond[length=10pt,width=6pt]}-},
+  use/.style={dashed,-{Stealth[length=6pt]}},
+  msg/.style={-{Stealth[length=6pt]}},
+  lbl/.style={font=\scriptsize,fill=white,inner sep=1pt},
+}
+
+\begin{document}
+
+% ---------- Титульный лист ----------
+\begin{titlepage}
+\centering
+Московский государственный университет имени М.\,В.~Ломоносова\\
+Факультет вычислительной математики и кибернетики
+\vfill
+{\large Отчёт по практикуму\\ по объектно-ориентированному программированию}\\[1cm]
+{\LARGE\bfseries Система автоматизации функций секретаря}
+\vfill
+\begin{flushright}
+Выполнил: студент группы \underline{\hspace{2cm}}\\
+\underline{\hspace{5cm}}
+\end{flushright}
+\vfill
+Москва, 2026
+\end{titlepage}
+
+\tableofcontents
+\newpage
+
+% =====================================================================
+\section{Уточнённая постановка задачи}
+
+Фирма состоит из $K$ отделов ($5 \le K \le 9$). В каждом отделе есть руководитель
+и несколько сотрудников, а также своё помещение. Кроме того, у фирмы есть общий
+конференц-зал. Работа отделов согласуется с помощью \textbf{общего календаря}
+событий. Виды событий:
+\begin{itemize}
+  \item ежедневная планёрка отдела (в начале рабочего дня, в помещении отдела);
+  \item совещание руководителей отделов (по понедельникам, в конференц-зале);
+  \item тематический семинар для сотрудников разных отделов (по средам);
+  \item рабочее совещание группы сотрудников;
+  \item командировка сотрудника (одна или несколько дней, вне фирмы).
+\end{itemize}
+
+У каждого события есть название, время начала, длительность, место проведения,
+список участников и степень важности (низкая, средняя, высокая).
+
+Система автоматизирует следующие функции секретаря:
+\begin{enumerate}
+  \item \textbf{Актуализация календаря}: прошедшие события удаляются автоматически;
+        пользователь может добавлять новые события, изменять и удалять существующие.
+  \item \textbf{Просмотр календаря} на выбранную неделю для всей фирмы,
+        для отдела или для конкретного сотрудника.
+  \item \textbf{Напоминания} участникам о предстоящих событиях (моделируются как
+        отправленные письма). Начало и частота напоминаний зависят от важности
+        события; по умолчанию: низкая --- один раз за 1~день, средняя --- каждый
+        день за 2~дня, высокая --- каждый день за 4~дня.
+  \item \textbf{Контроль конфликтов} при добавлении и изменении событий.
+\end{enumerate}
+
+\subsection*{Конфликты и их разрешение}
+Выявляются три вида конфликтов:
+\begin{itemize}
+  \item сотрудник в это время уже участвует в другом событии;
+  \item помещение в это время уже занято;
+  \item участников больше, чем мест в помещении.
+\end{itemize}
+Планёрку разрешается пропустить: если у сотрудника в это время другое событие
+(например, командировка), он просто исключается из участников планёрки,
+и конфликтом это не считается.
+
+При обнаружении конфликта система подбирает варианты его разрешения:
+\begin{itemize}
+  \item перенести новое событие на ближайшее свободное время;
+  \item провести новое событие в другом помещении;
+  \item не приглашать занятых сотрудников;
+  \item перенести уже назначенное событие.
+\end{itemize}
+Пользователь выбирает один из вариантов, исправляет событие вручную или
+отклоняет заявку. В системе две категории пользователей: \textbf{администратор}
+может изменять и удалять уже назначенные события (в том числе выбирать последний
+вариант), \textbf{обычный пользователь} --- нет.
+
+\subsection*{Моделирование}
+Задаётся начальное состояние календаря (регулярные события на весь период и две
+командировки), после чего время изменяется пошагово. Период моделирования ---
+$N$ дней ($7 \le N \le 30$), шаг --- 30 минут или 1 час. Рабочий день по умолчанию
+с 9:00 до 18:00; ночи и выходные пропускаются.
+
+На каждом шаге:
+\begin{enumerate}
+  \item из календаря удаляются завершившиеся события;
+  \item рассылаются напоминания;
+  \item с некоторой вероятностью поступает новая заявка на событие, которая
+        проверяется на конфликты.
+\end{enumerate}
+
+Случайные заявки моделируются статистически. Если в среднем за рабочий день
+поступает $\lambda$ заявок, а длина рабочего дня $T$, то на шаге $\Delta t$ заявка
+поступает с вероятностью $p = \lambda \Delta t / T$. Остальные характеристики
+заявки выбираются по равномерному закону:
+\begin{itemize}
+  \item день проведения --- от следующего дня до пяти дней вперёд;
+  \item время начала --- любое получасовое время рабочего дня;
+  \item вид события --- совещание 45\,\%, семинар 25\,\%, командировка 15\,\%,
+        внеплановое совещание руководителей 15\,\%;
+  \item важность --- низкая 30\,\%, средняя 50\,\%, высокая 20\,\%;
+  \item число участников --- в заданных для каждого вида пределах.
+\end{itemize}
+
+Конфликты случайных заявок разрешаются либо пользователем (моделирование
+приостанавливается), либо автоматически --- выбирается первый допустимый
+для текущей категории пользователя вариант.
+
+\textbf{Параметры моделирования}:
+\begin{itemize}
+  \item $K$ и число сотрудников в отделе;
+  \item $N$, шаг моделирования, дата начала и рабочие часы;
+  \item среднее число заявок в день $\lambda$;
+  \item правила напоминаний для каждой степени важности;
+  \item режим разрешения конфликтов и категория пользователя.
+\end{itemize}
+По окончании моделирования выводится итоговый отчёт:
+\begin{itemize}
+  \item список состоявшихся событий;
+  \item число заявок, конфликтов, отклонённых заявок и напоминаний;
+  \item загрузка конференц-зала.
+\end{itemize}
+
+% =====================================================================
+\section{Диаграмма классов}
+
+Ниже приведены три диаграммы. На рис.~\ref{fig:hier} показаны иерархии
+наследования, на рис.~\ref{fig:domain} --- связи классов предметной области,
+на рис.~\ref{fig:struct} --- общая структура моделирующей части системы.
+
+Обозначения на диаграммах:
+\begin{itemize}
+  \item стрелка с полым треугольником --- наследование;
+  \item полый ромб --- агрегация;
+  \item закрашенный ромб --- композиция;
+  \item пунктирная стрелка --- использование.
+\end{itemize}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}[node distance=1.2cm]
+  % События
+  \node[cls] (event) at (0,0) {Event\\\textit{(абстрактный)}};
+  \node[cls,minimum width=2.6cm,font=\footnotesize\ttfamily] (dm)  at (-6.4,-2.2) {DailyMeeting};
+  \node[cls,minimum width=2.6cm,font=\footnotesize\ttfamily] (mm)  at (-3.2,-2.2) {ManagersMeeting};
+  \node[cls,minimum width=2.6cm,font=\footnotesize\ttfamily] (sem) at (0,-2.2)    {Seminar};
+  \node[cls,minimum width=2.6cm,font=\footnotesize\ttfamily] (wm)  at (3.2,-2.2)  {WorkMeeting};
+  \node[cls,minimum width=2.6cm,font=\footnotesize\ttfamily] (bt)  at (6.4,-2.2)  {BusinessTrip};
+  \foreach \c in {dm,mm,sem,wm,bt} \draw[inh] (\c.north) -- (event.south);
+
+  % Люди
+  \node[cls] (person) at (-4,-4.4) {Person\\\textit{(абстрактный)}};
+  \node[cls] (emp)    at (-4,-6.2) {Employee};
+  \node[cls] (head)   at (-4,-8.0) {DepartmentHead};
+  \draw[inh] (emp.north) -- (person.south);
+  \draw[inh] (head.north) -- (emp.south);
+
+  % Помещения
+  \node[cls] (room)  at (3,-4.4) {Room\\\textit{(абстрактный)}};
+  \node[cls] (droom) at (1.2,-6.6) {DepartmentRoom};
+  \node[cls] (hall)  at (4.8,-6.6) {ConferenceHall};
+  \draw[inh] (droom.north) -- (room.south);
+  \draw[inh] (hall.north) -- (room.south);
+\end{tikzpicture}
+\caption{Иерархии наследования: события, люди, помещения}
+\label{fig:hier}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}
+  \node[cls] (company) at (0,0)     {Company};
+  \node[cls] (dept)    at (0,-2.2)  {Department};
+  \node[cls] (emp)     at (0,-4.4)  {Employee};
+  \node[cls] (room)    at (-5,-4.4) {Room};
+  \node[cls] (cal)     at (5,0)     {Calendar};
+  \node[cls] (event)   at (5,-2.2)  {Event};
+
+  \draw[comp] (company.south) -- node[lbl,pos=0.75,right] {1..K} (dept.north);
+  \draw[comp] (dept.south) -- node[lbl,pos=0.75,right] {1..*} (emp.north);
+  \draw[comp] (company.west) -| node[lbl,pos=0.9,left] {1..*} (room.north);
+  \draw[comp] (cal.south) -- node[lbl,pos=0.75,right] {0..*} (event.north);
+  \draw[agg]  (event.south west) -- node[lbl,pos=0.8,above] {участники, M:N} (emp.north east);
+  \draw[use]  (event.south) -- ++(0,-3.0) -| node[lbl,pos=0.25,above] {место проведения} (room.south);
+\end{tikzpicture}
+\caption{Классы предметной области и связи между ними}
+\label{fig:domain}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}
+  \node[cls] (sim)  at (0,0)       {Simulation};
+  \node[cls] (comp) at (-5.6,0)    {Company};
+  \node[cls] (cal)  at (5.6,0)     {Calendar};
+  \node[cls] (gen)  at (-2.8,2.8)  {EventGenerator};
+  \node[cls] (not)  at (2.8,2.8)   {Notifier};
+  \node[cls] (res)  at (-2.8,-2.8) {ConflictResolver};
+  \node[cls] (chk)  at (2.8,-2.8)  {ConflictChecker};
+
+  % Simulation содержит все части
+  \draw[comp] (sim.west) -- (comp.east);
+  \draw[comp] (sim.east) -- (cal.west);
+  \draw[comp] (sim.north west) -- (gen.south);
+  \draw[comp] (sim.north east) -- (not.south);
+  \draw[comp] (sim.south west) -- (res.north);
+  \draw[comp] (sim.south east) -- (chk.north);
+  % ConflictResolver содержит свой ConflictChecker
+  \draw[comp] (res.east) -- (chk.west);
+
+  % Использование
+  \draw[use] (gen.west) -| (comp.north);
+  \draw[use] (gen.north) -- ++(0,0.6) -| (cal.north);
+  \draw[use] (not.east) -| (cal.north);
+  \draw[use] (chk.east) -| (cal.south);
+  \draw[use] (res.west) -| (comp.south);
+\end{tikzpicture}
+\caption{Структура моделирующей части системы}
+\label{fig:struct}
+\end{figure}
+
+Вспомогательные структуры (на диаграммах не показаны):
+\begin{itemize}
+  \item \texttt{Conflict} --- описание найденного конфликта;
+  \item \texttt{FixOption} --- вариант его разрешения;
+  \item \texttt{PendingRequest} --- заявка, ожидающая решения пользователя;
+  \item \texttt{SimulationParams} --- параметры моделирования;
+  \item \texttt{Statistics} --- итоговая статистика;
+  \item \texttt{Clock} и \texttt{WorkSchedule} --- перевод модельного времени
+        в даты и рабочий график.
+\end{itemize}
+
+% =====================================================================
+\section{Текстовые спецификации основных классов}
+
+Модельное время хранится как целое число минут от 00:00 первого дня периода
+(тип \texttt{Minutes}).
+
+\subsection*{Event --- календарное событие}
+\begin{Verbatim}
+// Абстрактный базовый класс всех событий
+class Event {
+public:
+    Event(string title, Minutes start, Minutes duration,
+          Room* room, Importance importance);
+    virtual EventKind kind() const = 0;              // вид события
+    virtual unique_ptr<Event> clone() const = 0;      // копия события
+    virtual bool allowsAbsence() const;               // можно ли пропустить
+    virtual const Department* ownerDepartment() const;// отдел события
+    // чтение: id(), title(), start(), end(), duration(), room(),
+    //         importance(), participants()
+    // изменение: setStart(), setDuration(), setRoom(), setImportance(),
+    //            setParticipants(), removeParticipant()
+    bool overlaps(const Event& other) const;  // пересечение по времени
+    bool hasParticipant(const Employee* e) const;
+    bool involves(const Department* d) const;
+    void markReminded(Minutes t);              // учёт напоминаний
+};
+// Наследники: DailyMeeting (allowsAbsence() = true), ManagersMeeting,
+//             Seminar, WorkMeeting, BusinessTrip (без помещения)
+\end{Verbatim}
+
+\subsection*{Calendar --- общий календарь фирмы}
+\begin{Verbatim}
+class Calendar {
+public:
+    int add(unique_ptr<Event> event);          // добавить, вернуть id
+    unique_ptr<Event> remove(int id);          // убрать событие
+    Event* find(int id) const;
+    // убрать и вернуть события, закончившиеся к моменту now
+    vector<unique_ptr<Event>> removeFinished(Minutes now);
+    // события в промежутке [from, to) для фирмы / отдела / сотрудника
+    vector<Event*> query(Minutes from, Minutes to,
+                         const EventFilter& filter) const;
+private:
+    void markAbsences(Event& added);  // исключение из пропускаемых планёрок
+    vector<unique_ptr<Event>> events_;  // календарь владеет событиями
+};
+\end{Verbatim}
+
+\subsection*{Company --- фирма}
+\begin{Verbatim}
+class Company {
+public:
+    // создание K отделов со случайными сотрудниками
+    static unique_ptr<Company> generate(int departments,
+                                        int staffPerDepartment, mt19937& rng);
+    const vector<unique_ptr<Department>>& departments() const;
+    const vector<unique_ptr<Room>>& rooms() const;
+    ConferenceHall* conferenceHall() const;
+    vector<Employee*> allEmployees() const;
+    vector<Employee*> heads() const;          // руководители отделов
+};
+\end{Verbatim}
+
+\subsection*{ConflictChecker и ConflictResolver --- контроль конфликтов}
+\begin{Verbatim}
+class ConflictChecker {
+public:
+    // конфликты события с календарём (skipId - не учитывать это событие)
+    vector<Conflict> check(const Event& event, int skipId = 0) const;
+};
+
+class ConflictResolver {
+public:
+    // варианты разрешения найденных конфликтов
+    vector<FixOption> suggest(const Event& newEvent,
+                              const vector<Conflict>& conflicts,
+                              Minutes now, int skipId = 0) const;
+    void apply(const FixOption& option, Event& newEvent);  // применить
+    // номер первого допустимого варианта для авто-режима (или -1)
+    int chooseAuto(const vector<FixOption>& options, bool isAdmin) const;
+    // ближайшее свободное время не раньше from (или -1)
+    Minutes findFreeTime(const Event& event, Minutes from, int skipId,
+                         const Event* avoid = nullptr) const;
+};
+\end{Verbatim}
+
+\subsection*{Notifier --- рассылка напоминаний}
+\begin{Verbatim}
+class Notifier {
+public:
+    explicit Notifier(const ReminderRule rules[3]);  // по степени важности
+    // разослать напоминания, которые пора отправить; вернуть письма
+    vector<Message> process(Calendar& calendar, Minutes now);
+};
+\end{Verbatim}
+
+\subsection*{EventGenerator --- генерация событий}
+\begin{Verbatim}
+class EventGenerator {
+public:
+    // начальный календарь: планёрки, совещания, семинары, командировки
+    void fillInitial(Calendar& calendar, const ConflictChecker& checker);
+    bool requestArrives(double perDay, Minutes step);  // пришла ли заявка
+    unique_ptr<Event> randomRequest(Minutes now);      // случайная заявка
+};
+\end{Verbatim}
+
+\subsection*{Simulation --- моделирование}
+\begin{Verbatim}
+class Simulation {
+public:
+    explicit Simulation(const SimulationParams& params);
+    void step();                 // один шаг моделирования
+    bool finished() const;
+    // заявки пользователя и разрешение конфликтов
+    void submit(unique_ptr<Event> event, int replacesId = 0);
+    bool hasPending() const;
+    const PendingRequest& pending() const;
+    void choosePending(int optionIndex);
+    void replacePending(unique_ptr<Event> edited);
+    void rejectPending();
+    bool cancelEvent(int id);    // только администратор
+    void setRole(UserRole role);
+    // доступ: company(), calendar(), log(), messages(), history(), stats()
+};
+\end{Verbatim}
+
+% =====================================================================
+\section{Диаграмма объектов}
+
+На рис.~\ref{fig:objects} показаны основные объекты системы во время
+моделирования. Стрелки помечены вызываемыми операциями.
+
+\begin{figure}[H]
+\centering
+\begin{tikzpicture}
+  \node[obj] (sim)  at (0,0)       {sim\\: Simulation};
+  \node[obj] (comp) at (-5.6,0)    {company\\: Company};
+  \node[obj] (cal)  at (5.6,0)     {calendar\\: Calendar};
+  \node[obj] (gen)  at (-2.8,2.8)  {generator\\: EventGenerator};
+  \node[obj] (not)  at (2.8,2.8)   {notifier\\: Notifier};
+  \node[obj] (res)  at (-2.8,-2.8) {resolver\\: ConflictResolver};
+  \node[obj] (chk)  at (2.8,-2.8)  {checker\\: ConflictChecker};
+
+  \node[obj] (d1)  at (-5.6,-4.6) {sales\\: Department};
+  \node[obj] (e1)  at (1.6,-4.6)  {petrov\\: Employee};
+  \node[obj] (ev1) at (5.6,-4.6)  {seminar\\: Seminar};
+
+  \draw[msg] (sim) -- node[lbl,sloped,above] {randomRequest()} (gen);
+  \draw[msg] (sim) -- node[lbl,sloped,above] {process()} (not);
+  \draw[msg] (sim) -- node[lbl,sloped,below] {suggest(), apply()} (res);
+  \draw[msg] (sim) -- node[lbl,sloped,below] {check()} (chk);
+  \draw[msg] (sim) -- node[lbl,above] {add()} (cal);
+  \draw[msg] (gen) -- node[lbl,sloped,above] {allEmployees()} (comp);
+  \draw[msg] (not) -- node[lbl,sloped,above] {events()} (cal);
+  \draw[msg] (chk) -- node[lbl,sloped,below] {events()} (cal);
+  \draw[msg] (res) -- node[lbl,above] {check()} (chk);
+  \draw[msg] (comp) -- node[lbl,right] {staff()} (d1);
+  \draw[msg] (cal) -- node[lbl,right,align=left] {overlaps(),\\hasParticipant()} (ev1);
+  \draw[msg] (ev1) -- node[lbl,above] {name()} (e1);
+\end{tikzpicture}
+\caption{Диаграмма объектов}
+\label{fig:objects}
+\end{figure}
+
+% TODO: после готовности интерфейса добавить объекты mainWindow : MainWindow
+% и calendarView : CalendarView (вызовы step(), calendar().query()).
+
+% =====================================================================
+\section{Инструментальные средства}
+
+\begin{itemize}
+  \item Язык разработки --- C++ (стандарт C++20).
+  \item Компилятор --- GCC 13.3.
+  \item Система сборки --- CMake 3.28.
+  \item Библиотека интерфейса --- Qt 5.15 (модуль Widgets).
+  \item Операционная система --- Ubuntu 24.04.
+  \item Среда разработки --- \underline{\hspace{4cm}}.
+\end{itemize}
+
+% =====================================================================
+\section{Файловая структура системы}
+
+Моделирующая часть (каталог \texttt{src/model}) не зависит от Qt и собирается
+как отдельная библиотека; интерфейс (каталог \texttt{src/gui}) только вызывает
+её методы.
+
+\begin{center}
+\begin{tabular}{p{5.2cm}p{9.8cm}}
+\toprule
+Файл & Содержимое \\
+\midrule
+\texttt{Time.h, Time.cpp} & модельное время, классы \texttt{Clock}, \texttt{WorkSchedule} \\
+\texttt{Company.h, Company.cpp} & \texttt{Person}, \texttt{Employee}, \texttt{DepartmentHead},
+  \texttt{Room}, \texttt{DepartmentRoom}, \texttt{ConferenceHall}, \texttt{Department},
+  \texttt{Company} \\
+\texttt{Events.h, Events.cpp} & \texttt{Event} и наследники: \texttt{DailyMeeting},
+  \texttt{ManagersMeeting}, \texttt{Seminar}, \texttt{WorkMeeting}, \texttt{BusinessTrip} \\
+\texttt{Calendar.h, Calendar.cpp} & \texttt{Calendar}, \texttt{EventFilter} \\
+\texttt{Conflicts.h, Conflicts.cpp} & \texttt{Conflict}, \texttt{ConflictChecker},
+  \texttt{FixOption}, \texttt{ConflictResolver} \\
+\texttt{Notifier.h, Notifier.cpp} & \texttt{ReminderRule}, \texttt{Message}, \texttt{Notifier} \\
+\texttt{Generator.h, Generator.cpp} & \texttt{EventGenerator} \\
+\texttt{Simulation.h, Simulation.cpp} & \texttt{SimulationParams}, \texttt{Statistics},
+  \texttt{PendingRequest}, \texttt{Simulation} \\
+\midrule
+\texttt{main.cpp} & главный файл, запуск приложения \\
+% TODO: дополнить файлами интерфейса из src/gui
+\texttt{CMakeLists.txt} & описание сборки \\
+\bottomrule
+\end{tabular}
+\end{center}
+
+% =====================================================================
+\section{Пользовательский интерфейс}
+
+% TODO: заполнить после готовности интерфейса: скриншоты окна параметров
+% и главного окна, описание элементов управления.
+\textit{Раздел будет дополнен.}
+
+% =====================================================================
+\section{Проведённые эксперименты}
+
+% TODO: заполнить по результатам прогонов (зависимость числа конфликтов
+% и загрузки конференц-зала от K, интенсивности заявок, роли пользователя).
+\textit{Раздел будет дополнен.}
+
+\end{document}
