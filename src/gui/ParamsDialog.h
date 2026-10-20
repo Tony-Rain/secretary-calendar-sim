@@ -18,6 +18,7 @@ private:
     QSpinBox* spinDays;
     QComboBox* comboStep;
     QDoubleSpinBox* spinRequests;
+    QSpinBox* spinSeed;
     QComboBox* comboMode;
     QComboBox* comboRole;
 };

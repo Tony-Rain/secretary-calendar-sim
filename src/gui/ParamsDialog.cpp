@@ -40,6 +40,10 @@ ParamsDialog::ParamsDialog(QWidget* parent) : QDialog(parent) {
     spinRequests->setValue(3);
     form->addRow("Заявок в день (в среднем):", spinRequests);
 
+    spinSeed = new QSpinBox();
+    spinSeed->setRange(1, 1000);
+    form->addRow("Случайное зерно:", spinSeed);
+
     comboMode = new QComboBox();
     comboMode->addItem("Спрашивать пользователя");
     comboMode->addItem("Решать автоматически");
@@ -65,6 +69,7 @@ SimulationParams ParamsDialog::getParams() const {
     p.days = spinDays->value();
     p.step = comboStep->currentData().toInt();
     p.requestsPerDay = spinRequests->value();
+    p.seed = spinSeed->value();
     p.conflictMode = (comboMode->currentIndex() == 0) ? ConflictMode::Manual : ConflictMode::Auto;
 
     auto now = std::chrono::system_clock::now();
