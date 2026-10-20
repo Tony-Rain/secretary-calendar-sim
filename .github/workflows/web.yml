@@ -36,7 +36,7 @@ jobs:
 
       - name: Build
         run: |
-          $HOME/Qt/6.6.3/wasm_singlethread/bin/qt-cmake -S . -B build-web -DCMAKE_BUILD_TYPE=Release -DQT_HOST_PATH=$HOME/Qt/6.6.3/gcc_64
+          bash $HOME/Qt/6.6.3/wasm_singlethread/bin/qt-cmake -S . -B build-web -DCMAKE_BUILD_TYPE=Release -DQT_HOST_PATH=$HOME/Qt/6.6.3/gcc_64
           cmake --build build-web -j4
 
       - name: Site
