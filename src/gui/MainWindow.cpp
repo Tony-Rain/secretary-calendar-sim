@@ -94,7 +94,7 @@ MainWindow::MainWindow(const SimulationParams& params, QWidget* parent) : QMainW
 
     connect(comboDep, static_cast<void(QComboBox::*)(int)>(&QComboBox::currentIndexChanged), this, &MainWindow::onFilterChanged);
     connect(comboEmp, static_cast<void(QComboBox::*)(int)>(&QComboBox::currentIndexChanged), this, &MainWindow::onFilterChanged);
-    connect(dateEdit, static_cast<void(QDateEdit::*)(const QDate&)>(&QDateEdit::dateChanged), this, &MainWindow::onDayChanged);
+    connect(dateEdit, &QDateEdit::dateChanged, this, &MainWindow::onDayChanged);
 
     QMenu* menu = menuBar()->addMenu("Эксперимент");
     menu->addAction("Новый эксперимент...", this, &MainWindow::onNewExperiment);
