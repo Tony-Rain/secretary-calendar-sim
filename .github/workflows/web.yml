@@ -1,0 +1,61 @@
+name: web
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Qt
+        run: |
+          pip install aqtinstall
+          aqt install-qt linux desktop 6.6.3 gcc_64 -O $HOME/Qt
+          aqt install-qt linux desktop 6.6.3 wasm_singlethread -O $HOME/Qt
+
+      - uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: 3.1.37
+
+      - name: Build
+        run: |
+          $HOME/Qt/6.6.3/wasm_singlethread/bin/qt-cmake -S . -B build-web -DCMAKE_BUILD_TYPE=Release -DQT_HOST_PATH=$HOME/Qt/6.6.3/gcc_64
+          cmake --build build-web -j4
+
+      - name: Site
+        run: |
+          mkdir site
+          cp build-web/secretary.js build-web/secretary.wasm build-web/qtloader.js site/
+          cp build-web/secretary.html site/index.html
+          cp build-web/qtlogo.svg site/ || true
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4
