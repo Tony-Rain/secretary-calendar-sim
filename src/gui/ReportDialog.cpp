@@ -7,6 +7,8 @@
 
 using namespace sec;
 
+static bool byStart(Event* a, Event* b) { return a->start() < b->start(); }
+
 ReportDialog::ReportDialog(Simulation* s, QWidget* parent) : QDialog(parent) {
     setWindowTitle("Итоговый отчет");
     resize(650, 550);
@@ -19,7 +21,7 @@ ReportDialog::ReportDialog(Simulation* s, QWidget* parent) : QDialog(parent) {
     for (int d = 0; d < s->params().days; ++d)
         if (s->schedule().isWorkingDay(d)) workDays++;
     int hallTotal = workDays * s->schedule().workdayLength();
-    int hallPercent = hallTotal > 0 ? st.hallBusy * 100 / hallTotal : 0;
+    int hallPercent = st.hallBusy * 100 / hallTotal;
 
     QString report = "ИТОГИ МОДЕЛИРОВАНИЯ\n";
     report += "Период: " + QString::number(s->params().days) + " дн., отделов: " +
@@ -35,7 +37,7 @@ ReportDialog::ReportDialog(Simulation* s, QWidget* parent) : QDialog(parent) {
     report += "\nСОСТОЯВШИЕСЯ СОБЫТИЯ\n";
     std::vector<Event*> held;
     for (const auto& e : s->history()) held.push_back(e.get());
-    std::sort(held.begin(), held.end(), [](Event* a, Event* b) { return a->start() < b->start(); });
+    std::sort(held.begin(), held.end(), byStart);
 
     int lastDay = -1;
     for (Event* e : held) {

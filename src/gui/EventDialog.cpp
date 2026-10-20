@@ -139,7 +139,6 @@ void EventDialog::loadEvent(std::unique_ptr<Event> e) {
     original = std::move(e);
     editTitle->setText(QString::fromStdString(original->title()));
 
-    // тип при изменении не меняется
     if (original->kind() == EventKind::DailyMeeting)
         comboType->addItem("Планёрка", (int)EventKind::DailyMeeting);
     comboType->setCurrentIndex(comboType->findData((int)original->kind()));
@@ -188,7 +187,7 @@ std::unique_ptr<Event> EventDialog::getResult() {
 
     std::unique_ptr<Event> res;
     if (original) {
-        res = original->clone();  // сохраняем вид события и счетчик напоминаний
+        res = original->clone();
     } else {
         EventKind kind = (EventKind)comboType->currentData().toInt();
         if (kind == EventKind::WorkMeeting) res = std::make_unique<WorkMeeting>(title, start, dur, room, imp);

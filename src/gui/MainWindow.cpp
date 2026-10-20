@@ -49,7 +49,7 @@ MainWindow::MainWindow(const SimulationParams& params, QWidget* parent) : QMainW
     dateEdit = new QDateEdit(QDate::currentDate());
     comboDep = new QComboBox();
     comboEmp = new QComboBox();
-    // список выпадает вниз, а не поверх поля (иначе закрывается сразу после клика)
+    // иначе список сразу закрывается
     comboDep->setStyleSheet("combobox-popup: 0;");
     comboEmp->setStyleSheet("combobox-popup: 0;");
     comboEmp->setMaxVisibleItems(15);
@@ -113,11 +113,6 @@ void MainWindow::startSimulation(const SimulationParams& params) {
     textLog->clear();
     textDetails->clear();
 
-    // пока заполняем списки, фильтр не пересчитываем
-    comboDep->blockSignals(true);
-    comboEmp->blockSignals(true);
-    dateEdit->blockSignals(true);
-
     comboDep->clear();
     comboDep->addItem("Все отделы", -1);
     for (int i = 0; i < sim->params().departments; ++i) {
@@ -132,10 +127,6 @@ void MainWindow::startSimulation(const SimulationParams& params) {
     dateEdit->setMinimumDate(simStart);
     dateEdit->setMaximumDate(simStart.addDays(sim->params().days - 1));
     dateEdit->setDate(simStart);
-
-    comboDep->blockSignals(false);
-    comboEmp->blockSignals(false);
-    dateEdit->blockSignals(false);
 
     updateUi();
     setRunning(false);
@@ -297,7 +288,6 @@ void MainWindow::onAdd() {
     });
     dlg->open();
 }
-
 
 void MainWindow::onEdit() {
     QListWidgetItem* item = listEvents->currentItem();
