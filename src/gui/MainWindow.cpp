@@ -29,14 +29,17 @@ MainWindow::MainWindow(const SimulationParams& params, QWidget* parent) : QMainW
     QVBoxLayout* mainLayout = new QVBoxLayout(central);
 
     QHBoxLayout* topBar = new QHBoxLayout();
-    QPushButton* btnStart = new QPushButton("Старт");
-    QPushButton* btnStep = new QPushButton("Шаг");
-    QPushButton* btnStop = new QPushButton("Стоп");
+    btnStart = new QPushButton("Старт");
+    btnStep = new QPushButton("Шаг");
+    btnStop = new QPushButton("Стоп");
+    lblState = new QLabel();
+    lblState->setMinimumWidth(130);
     lblTime = new QLabel("Время: ");
 
     topBar->addWidget(btnStart);
     topBar->addWidget(btnStep);
     topBar->addWidget(btnStop);
+    topBar->addWidget(lblState);
     topBar->addWidget(lblTime);
     topBar->addStretch();
     mainLayout->addLayout(topBar);
@@ -45,6 +48,10 @@ MainWindow::MainWindow(const SimulationParams& params, QWidget* parent) : QMainW
     dateEdit = new QDateEdit(QDate::currentDate());
     comboDep = new QComboBox();
     comboEmp = new QComboBox();
+    // список выпадает вниз, а не поверх поля (иначе закрывается сразу после клика)
+    comboDep->setStyleSheet("combobox-popup: 0;");
+    comboEmp->setStyleSheet("combobox-popup: 0;");
+    comboEmp->setMaxVisibleItems(15);
     filterBar->addWidget(new QLabel("Дата:"));
     filterBar->addWidget(dateEdit);
     filterBar->addWidget(new QLabel("Отдел:"));
@@ -103,20 +110,42 @@ MainWindow::MainWindow(const SimulationParams& params, QWidget* parent) : QMainW
     dateEdit->setMaximumDate(simStart.addDays(sim->params().days - 1));
 
     updateUi();
+    setRunning(false);
 }
 
-void MainWindow::onStart() { timer->start(500); }
-void MainWindow::onStop() { timer->stop(); }
+void MainWindow::setRunning(bool running) {
+    if (running && !sim->finished())
+        timer->start(500);
+    else
+        timer->stop();
+
+    if (sim->finished()) {
+        lblState->setText("■ Завершено");
+        lblState->setStyleSheet("font-weight: bold; color: gray;");
+    } else if (timer->isActive()) {
+        lblState->setText("▶ Идёт");
+        lblState->setStyleSheet("font-weight: bold; color: green;");
+    } else {
+        lblState->setText("⏸ Пауза");
+        lblState->setStyleSheet("font-weight: bold; color: darkorange;");
+    }
+    btnStart->setEnabled(!timer->isActive() && !sim->finished());
+    btnStep->setEnabled(!sim->finished());
+    btnStop->setEnabled(timer->isActive());
+}
+
+void MainWindow::onStart() { setRunning(true); }
+void MainWindow::onStop() { setRunning(false); }
 
 void MainWindow::onTick() {
     sim->step();
     updateUi();
     if (sim->hasPending()) {
-        timer->stop();
+        setRunning(false);
         handleConflicts();
     }
     if (sim->finished()) {
-        timer->stop();
+        setRunning(false);
         ReportDialog* dlg = new ReportDialog(sim, this);
         dlg->setAttribute(Qt::WA_DeleteOnClose);
         dlg->open();
@@ -124,9 +153,10 @@ void MainWindow::onTick() {
 }
 
 void MainWindow::onStep() {
-    timer->stop();
+    setRunning(false);
     sim->step();
     updateUi();
+    setRunning(false);
     if (sim->hasPending()) handleConflicts();
 }
 
@@ -206,7 +236,7 @@ void MainWindow::onEventSelected() {
 }
 
 void MainWindow::onAdd() {
-    timer->stop();
+    setRunning(false);
     EventDialog* dlg = new EventDialog(sim, this);
     dlg->setAttribute(Qt::WA_DeleteOnClose);
     connect(dlg, &QDialog::accepted, this, [this, dlg]() {
@@ -224,7 +254,7 @@ void MainWindow::onAdd() {
 void MainWindow::onEdit() {
     QListWidgetItem* item = listEvents->currentItem();
     if (!item) return;
-    timer->stop();
+    setRunning(false);
     int id = item->data(Qt::UserRole).toInt();
     Event* e = sim->calendar().find(id);
 

@@ -31,11 +31,16 @@ private slots:
 private:
     void updateUi();
     void handleConflicts();
+    void setRunning(bool running);
 
     sec::Simulation* sim;
     QTimer* timer;
 
     QLabel* lblTime;
+    QLabel* lblState;
+    QPushButton* btnStart;
+    QPushButton* btnStep;
+    QPushButton* btnStop;
     QListWidget* listEvents;
     QTextEdit* textDetails;
     QPlainTextEdit* textLog;
