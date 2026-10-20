@@ -1,0 +1,416 @@
+#include <QPushButton>
+#include <QComboBox>
+#include <QCheckBox>
+#include <QTextBrowser>
+#include <QPlainTextEdit>
+#include <QLabel>
+#include <QProgressBar>
+#include <QVBoxLayout>
+#include <QHBoxLayout>
+#include <QScrollArea>
+#include <QMenuBar>
+#include <QMenu>
+#include <QAction>
+#include <QStatusBar>
+#include <QMessageBox>
+#include <QGroupBox>
+
+using namespace sec;
+
+MainWindow::MainWindow(const SimulationParams& params, QWidget* parent)
+    : QMainWindow(parent) {
+    sim = new Simulation(params);
+    lastLogSize = 0;
+    buildUi();
+    buildMenu();
+    view->setSimulation(sim);
+    view->setWeekStart(0);
+    refreshAll();
+}
+
+void MainWindow::buildUi() {
+    setWindowTitle("Секретарь — календарь компании");
+    resize(1280, 800);
+
+    QWidget* central = new QWidget();
+    setCentralWidget(central);
+    QVBoxLayout* main = new QVBoxLayout(central);
+
+    QHBoxLayout* control = new QHBoxLayout();
+    startBtn = new QPushButton("▶ Старт");
+    pauseBtn = new QPushButton("⏸ Пауза");
+    stepBtn = new QPushButton("⏭ Шаг");
+    stopBtn = new QPushButton("⏹ Стоп");
+    speedSlider = new QSlider(Qt::Horizontal);
+    speedSlider->setRange(100, 2000);
+    speedSlider->setValue(500);
+    roleCombo = new QComboBox();
+    roleCombo->addItem("Админ");
+    roleCombo->addItem("Пользователь");
+    control->addWidget(startBtn);
+    control->addWidget(pauseBtn);
+    control->addWidget(stepBtn);
+    control->addWidget(stopBtn);
+    control->addWidget(new QLabel("Скорость:"));
+    control->addWidget(speedSlider, 1);
+    control->addWidget(new QLabel("Роль:"));
+    control->addWidget(roleCombo);
+    main->addLayout(control);
+
+    QHBoxLayout* filters = new QHBoxLayout();
+    filterMode = new QComboBox();
+    filterMode->addItem("Вся компания");
+    filterMode->addItem("Отдел");
+    filterMode->addItem("Сотрудник");
+    depCombo = new QComboBox();
+    empCombo = new QComboBox();
+    colorCombo = new QComboBox();
+    colorCombo->addItem("По отделам");
+    colorCombo->addItem("По важности");
+    followCheck = new QCheckBox("Следить за текущим временем");
+    followCheck->setChecked(true);
+    QPushButton* prevW = new QPushButton("◀ неделя");
+    QPushButton* nextW = new QPushButton("неделя ▶");
+    filters->addWidget(new QLabel("Фильтр:"));
+    filters->addWidget(filterMode);
+    filters->addWidget(depCombo);
+    filters->addWidget(empCombo);
+    filters->addWidget(new QLabel("Цвет:"));
+    filters->addWidget(colorCombo);
+    filters->addWidget(prevW);
+    filters->addWidget(nextW);
+    filters->addWidget(followCheck);
+    filters->addStretch();
+    main->addLayout(filters);
+
+    QHBoxLayout* center = new QHBoxLayout();
+    QScrollArea* scroll = new QScrollArea();
+    scroll->setWidgetResizable(true);
+    view = new CalendarView();
+    scroll->setWidget(view);
+    center->addWidget(scroll, 3);
+    details = new QTextBrowser();
+    details->setMinimumWidth(280);
+    center->addWidget(details, 1);
+    main->addLayout(center, 1);
+
+    QHBoxLayout* evBtns = new QHBoxLayout();
+    addBtn = new QPushButton("Добавить");
+    editBtn = new QPushButton("Изменить");
+    delBtn = new QPushButton("Удалить");
+    evBtns->addWidget(addBtn);
+    evBtns->addWidget(editBtn);
+    evBtns->addWidget(delBtn);
+    evBtns->addStretch();
+    main->addLayout(evBtns);
+
+    main->addWidget(new QLabel("Журнал:"));
+    logEdit = new QPlainTextEdit();
+    logEdit->setReadOnly(true);
+    logEdit->setMaximumHeight(150);
+    main->addWidget(logEdit);
+
+    timeLabel = new QLabel();
+    stepLabel = new QLabel();
+    statsLabel = new QLabel();
+    progress = new QProgressBar();
+    progress->setMaximumWidth(200);
+    statusBar()->addWidget(timeLabel);
+    statusBar()->addWidget(stepLabel);
+    statusBar()->addWidget(progress);
+    statusBar()->addPermanentWidget(statsLabel);
+
+    timer = new QTimer(this);
+    connect(timer, &QTimer::timeout, this, &MainWindow::tick);
+    connect(speedSlider, &QSlider::valueChanged, this, [this](int v) {
+        timer->setInterval(v);
+    });
+
+    connect(startBtn, &QPushButton::clicked, this, &MainWindow::onStart);
+    connect(pauseBtn, &QPushButton::clicked, this, &MainWindow::onPause);
+    connect(stepBtn, &QPushButton::clicked, this, &MainWindow::onStep);
+    connect(stopBtn, &QPushButton::clicked, this, &MainWindow::onStop);
+    connect(prevW, &QPushButton::clicked, this, &MainWindow::onPrevWeek);
+    connect(nextW, &QPushButton::clicked, this, &MainWindow::onNextWeek);
+    connect(filterMode, static_cast<void(QComboBox::*)(int)>(&QComboBox::currentIndexChanged),
+            this, &MainWindow::onFilterChanged);
+    connect(depCombo, static_cast<void(QComboBox::*)(int)>(&QComboBox::currentIndexChanged),
+            this, &MainWindow::onFilterChanged);
+    connect(empCombo, static_cast<void(QComboBox::*)(int)>(&QComboBox::currentIndexChanged),
+            this, &MainWindow::onFilterChanged);
+    connect(colorCombo, static_cast<void(QComboBox::*)(int)>(&QComboBox::currentIndexChanged),
+            this, &MainWindow::onColorChanged);
+    connect(roleCombo, static_cast<void(QComboBox::*)(int)>(&QComboBox::currentIndexChanged),
+            this, &MainWindow::onRoleChanged);
+    connect(addBtn, &QPushButton::clicked, this, &MainWindow::onAdd);
+    connect(editBtn, &QPushButton::clicked, this, &MainWindow::onEdit);
+    connect(delBtn, &QPushButton::clicked, this, &MainWindow::onDelete);
+    connect(view, &CalendarView::eventSelected, this, &MainWindow::onEventSelected);
+    connect(view, &CalendarView::editRequested, this, &MainWindow::onEdit);
+
+    refreshFilters();
+    updateButtons();
+}
+
+void MainWindow::buildMenu() {
+    QMenu* file = menuBar()->addMenu("Файл");
+    QAction* newAct = file->addAction("Новый эксперимент");
+    QAction* repAct = file->addAction("Итоговый отчёт");
+    file->addSeparator();
+    QAction* exitAct = file->addAction("Выход");
+    connect(newAct, &QAction::triggered, this, &MainWindow::onNewExperiment);
+    connect(repAct, &QAction::triggered, this, &MainWindow::onReport);
+    connect(exitAct, &QAction::triggered, this, &QWidget::close);
+}
+
+void MainWindow::refreshFilters() {
+    depCombo->clear();
+    empCombo->clear();
+    std::vector<Department*> deps = sim->company().departments();
+    for (size_t i = 0; i < deps.size(); ++i)
+        depCombo->addItem(qs(deps[i]->name()));
+    std::vector<Employee*> emps = sim->company().allEmployees();
+    for (size_t i = 0; i < emps.size(); ++i)
+        empCombo->addItem(qs(emps[i]->name()) + " [" + qs(emps[i]->department()->name()) + "]");
+}
+
+void MainWindow::updateButtons() {
+    bool admin = sim->isAdmin();
+    editBtn->setEnabled(admin && view->selectedId() != 0);
+    delBtn->setEnabled(admin && view->selectedId() != 0);
+}
+
+void MainWindow::tick() {
+    sim->step();
+    refreshAll();
+    if (sim->hasPending()) {
+        bool wasActive = timer->isActive();
+        timer->stop();
+        handlePending();
+        if (wasActive && !sim->finished()) timer->start(speedSlider->value());
+    }
+    if (sim->finished()) {
+        timer->stop();
+        onReport();
+    }
+}
+
+void MainWindow::onStart() {
+    if (sim->finished()) return;
+    timer->start(speedSlider->value());
+}
+
+void MainWindow::onPause() { timer->stop(); }
+
+void MainWindow::onStep() {
+    timer->stop();
+    sim->step();
+    refreshAll();
+    if (sim->hasPending()) handlePending();
+    if (sim->finished()) onReport();
+}
+
+void MainWindow::onStop() {
+    timer->stop();
+    onReport();
+}
+
+void MainWindow::onNewExperiment() {
+    timer->stop();
+    ParamsDialog dlg(this);
+    if (dlg.exec() != QDialog::Accepted) return;
+    delete sim;
+    sim = new Simulation(dlg.params());
+    view->setSimulation(sim);
+    view->setWeekStart(0);
+    view->setSelectedId(0);
+    lastLogSize = 0;
+    logEdit->clear();
+    refreshFilters();
+    refreshAll();
+}
+
+void MainWindow::onReport() {
+    timer->stop();
+    ReportDialog dlg(sim, this);
+    dlg.exec();
+}
+
+void MainWindow::onPrevWeek() {
+    followCheck->setChecked(false);
+    view->setWeekStart(view->weekStart() - 7);
+    refreshAll();
+}
+
+void MainWindow::onNextWeek() {
+    followCheck->setChecked(false);
+    view->setWeekStart(view->weekStart() + 7);
+    refreshAll();
+}
+
+void MainWindow::onFilterChanged() {
+    EventFilter f;
+    f.department = nullptr;
+    f.employee = nullptr;
+    int mode = filterMode->currentIndex();
+    if (mode == 1) {
+        int idx = depCombo->currentIndex();
+        std::vector<Department*> deps = sim->company().departments();
+        if (idx >= 0 && idx < int(deps.size())) f.department = deps[idx];
+    } else if (mode == 2) {
+        int idx = empCombo->currentIndex();
+        std::vector<Employee*> emps = sim->company().allEmployees();
+        if (idx >= 0 && idx < int(emps.size())) f.employee = emps[idx];
+    }
+    view->setFilter(f);
+}
+
+void MainWindow::onColorChanged() {
+    view->setColorMode(colorCombo->currentIndex());
+}
+
+void MainWindow::onRoleChanged() {
+    sim->setRole(roleCombo->currentIndex() == 0 ? UserRole::Admin : UserRole::User);
+    updateButtons();
+    refreshDetails();
+}
+
+void MainWindow::onAdd() {
+    timer->stop();
+    EventDialog dlg(sim, this);
+    std::unique_ptr<Event> dummy = std::make_unique<WorkMeeting>("", 0, 30, nullptr, Importance::Medium);
+    dummy.reset();
+    std::unique_ptr<Event> empty;
+    dlg.loadFrom(std::unique_ptr<Event>());
+    if (dlg.exec() != QDialog::Accepted) return;
+    std::unique_ptr<Event> e = dlg.result();
+    if (!e) return;
+    sim->submit(std::move(e));
+    refreshAll();
+    if (sim->hasPending()) handlePending();
+    if (sim->finished()) onReport();
+}
+
+void MainWindow::onEdit() {
+    int id = view->selectedId();
+    if (id == 0) return;
+    Event* ev = sim->calendar().find(id);
+    if (!ev) return;
+    if (!sim->isAdmin()) {
+        QMessageBox::warning(this, "Нет прав", "Только админ может изменять события");
+        return;
+    }
+    timer->stop();
+    EventDialog dlg(sim, this);
+    dlg.loadFrom(ev->clone());
+    if (dlg.exec() != QDialog::Accepted) return;
+    std::unique_ptr<Event> e = dlg.result();
+    if (!e) return;
+    sim->submit(std::move(e), id);
+    refreshAll();
+    if (sim->hasPending()) handlePending();
+    if (sim->finished()) onReport();
+}
+
+void MainWindow::onDelete() {
+    int id = view->selectedId();
+    if (id == 0) return;
+    if (!sim->isAdmin()) {
+        QMessageBox::warning(this, "Нет прав", "Только админ может удалять события");
+        return;
+    }
+    if (QMessageBox::question(this, "Удаление", "Удалить выбранное событие?") != QMessageBox::Yes)
+        return;
+    sim->cancelEvent(id);
+    view->setSelectedId(0);
+    refreshAll();
+}
+
+void MainWindow::onEventSelected(int) {
+    updateButtons();
+    refreshDetails();
+}
+
+void MainWindow::handlePending() {
+    timer->stop();
+    while (sim->hasPending()) {
+        ConflictDialog dlg(sim, this);
+        if (dlg.exec() != QDialog::Accepted) {
+            sim->rejectPending();
+        }
+    }
+    refreshAll();
+}
+
+void MainWindow::refreshAll() {
+    if (followCheck->isChecked()) {
+        int d = dayOf(sim->now());
+        int ws = d - sim->schedule().clock.weekdayOf(d);
+        view->setWeekStart(ws);
+    }
+    view->update();
+    refreshLog();
+    refreshStatus();
+    refreshDetails();
+    updateButtons();
+}
+
+void MainWindow::refreshLog() {
+    const std::vector<LogEntry>& log = sim->log();
+    for (int i = lastLogSize; i < int(log.size()); ++i) {
+        QString line = qs(sim->schedule().clock.timeString(log[i].time)) +
+                       "  " + qs(log[i].text);
+        logEdit->appendPlainText(line);
+    }
+    lastLogSize = int(log.size());
+}
+
+void MainWindow::refreshStatus() {
+    timeLabel->setText("Время: " + qs(sim->schedule().clock.timeString(sim->now())));
+    stepLabel->setText("Шаг " + QString::number(sim->stepNumber()) +
+                       " из " + QString::number(sim->totalSteps()));
+    progress->setMaximum(sim->totalSteps());
+    progress->setValue(sim->stepNumber());
+    const Statistics& st = sim->stats();
+    statsLabel->setText(QString("Проведено: %1 | Отменено: %2 | Заявок: %3 | "
+                                "Конфликтов: %4 | Отклонено: %5 | Напоминаний: %6")
+                            .arg(st.held).arg(st.cancelled).arg(st.requests)
+                            .arg(st.conflicts).arg(st.rejected).arg(st.reminders));
+}
+
+void MainWindow::refreshDetails() {
+    int id = view->selectedId();
+    if (id == 0) {
+        details->setText("");
+        return;
+    }
+    Event* e = sim->calendar().find(id);
+    if (!e) {
+        details->setText("");
+        return;
+    }
+    QString html = "<h3>" + qs(e->title()) + "</h3>";
+    html += "<b>Тип:</b> " + qs(eventKindName(e->kind())) + "<br>";
+    html += "<b>Начало:</b> " + qs(sim->schedule().clock.timeString(e->start())) + "<br>";
+    html += "<b>Конец:</b> " + qs(sim->schedule().clock.timeString(e->end())) + "<br>";
+    html += "<b>Длительность:</b> " + QString::number(e->duration()) + " мин<br>";
+    if (e->room()) html += "<b>Помещение:</b> " + qs(e->room()->name()) + "<br>";
+    else html += "<b>Помещение:</b> —<br>";
+    html += "<b>Важность:</b> " + qs(importanceName(e->importance())) + "<br>";
+    html += "<b>Напоминаний отправлено:</b> " + QString::number(e->remindersSent()) + "<br>";
+
+    html += "<p><b>Участники:</b></p>";
+    std::vector<Employee*> parts = e->participants();
+    std::vector<Department*> deps = sim->company().departments();
+    for (size_t i = 0; i < deps.size(); ++i) {
+        QString block;
+        for (size_t j = 0; j < parts.size(); ++j) {
+            if (parts[j]->department() == deps[i]) {
+                block += "&nbsp;&nbsp;" + qs(parts[j]->name()) + "<br>";
+            }
+        }
+        if (!block.isEmpty())
+            html += "<b>" + qs(deps[i]->name()) + ":</b><br>" + block;
+    }
+    details->setHtml(html);
+}
