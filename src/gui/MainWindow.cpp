@@ -15,11 +15,12 @@
 #include <QDateEdit>
 #include <QMessageBox>
 #include <QDate>
+#include <QMenuBar>
 
 using namespace sec;
 
 MainWindow::MainWindow(const SimulationParams& params, QWidget* parent) : QMainWindow(parent) {
-    sim = new Simulation(params);
+    sim = nullptr;
     lastLogSize = 0;
     timer = new QTimer(this);
     connect(timer, &QTimer::timeout, this, &MainWindow::onTick);
@@ -95,22 +96,62 @@ MainWindow::MainWindow(const SimulationParams& params, QWidget* parent) : QMainW
     connect(comboEmp, static_cast<void(QComboBox::*)(int)>(&QComboBox::currentIndexChanged), this, &MainWindow::onFilterChanged);
     connect(dateEdit, static_cast<void(QDateEdit::*)(const QDate&)>(&QDateEdit::dateChanged), this, &MainWindow::onDayChanged);
 
-    for (int i = 0; i < sim->params().departments; ++i) {
-        comboDep->addItem(QString("Отдел %1").arg(i + 1), i);
-    }
-    comboDep->insertItem(0, "Все отделы", -1);
+    QMenu* menu = menuBar()->addMenu("Эксперимент");
+    menu->addAction("Новый эксперимент...", this, &MainWindow::onNewExperiment);
+    menu->addAction("Итоговый отчет", this, &MainWindow::onReport);
+    menu->addSeparator();
+    menu->addAction("Выход", this, &QWidget::close);
 
+    startSimulation(params);
+}
+
+void MainWindow::startSimulation(const SimulationParams& params) {
+    timer->stop();
+    delete sim;
+    sim = new Simulation(params);
+    lastLogSize = 0;
+    textLog->clear();
+    textDetails->clear();
+
+    // пока заполняем списки, фильтр не пересчитываем
+    comboDep->blockSignals(true);
+    comboEmp->blockSignals(true);
+    dateEdit->blockSignals(true);
+
+    comboDep->clear();
+    comboDep->addItem("Все отделы", -1);
+    for (int i = 0; i < sim->params().departments; ++i) {
+        comboDep->addItem(QString::fromStdString(sim->company().departments()[i]->name()), i);
+    }
+    comboEmp->clear();
+    comboEmp->addItem("Все сотрудники", -1);
     for (auto& emp : sim->company().allEmployees()) {
         comboEmp->addItem(QString::fromStdString(emp->name()), emp->id());
     }
-    comboEmp->insertItem(0, "Все сотрудники", -1);
     QDate simStart(int(sim->params().startDate.year()), unsigned(sim->params().startDate.month()), unsigned(sim->params().startDate.day()));
-    dateEdit->setDate(simStart);
     dateEdit->setMinimumDate(simStart);
     dateEdit->setMaximumDate(simStart.addDays(sim->params().days - 1));
+    dateEdit->setDate(simStart);
+
+    comboDep->blockSignals(false);
+    comboEmp->blockSignals(false);
+    dateEdit->blockSignals(false);
 
     updateUi();
     setRunning(false);
+}
+
+void MainWindow::onNewExperiment() {
+    setRunning(false);
+    ParamsDialog dlg(this);
+    if (dlg.exec() == QDialog::Accepted) startSimulation(dlg.getParams());
+}
+
+void MainWindow::onReport() {
+    setRunning(false);
+    ReportDialog* dlg = new ReportDialog(sim, this);
+    dlg->setAttribute(Qt::WA_DeleteOnClose);
+    dlg->open();
 }
 
 void MainWindow::setRunning(bool running) {
@@ -144,12 +185,7 @@ void MainWindow::onTick() {
         setRunning(false);
         handleConflicts();
     }
-    if (sim->finished()) {
-        setRunning(false);
-        ReportDialog* dlg = new ReportDialog(sim, this);
-        dlg->setAttribute(Qt::WA_DeleteOnClose);
-        dlg->open();
-    }
+    if (sim->finished()) onReport();
 }
 
 void MainWindow::onStep() {
@@ -221,18 +257,30 @@ void MainWindow::onFilterChanged() { updateUi(); }
 
 void MainWindow::onEventSelected() {
     QListWidgetItem* item = listEvents->currentItem();
+    bool isAdmin = sim->isAdmin();
+    btnEdit->setEnabled(isAdmin && item != nullptr);
+    btnDel->setEnabled(isAdmin && item != nullptr);
     if (!item) {
         textDetails->clear();
         return;
     }
     int id = item->data(Qt::UserRole).toInt();
     Event* e = sim->calendar().find(id);
-    if (e) {
-        QString text = "Название: " + QString::fromStdString(e->title()) + "\n";
-        text += "Важность: " + QString::number((int)e->importance()) + "\n";
-        text += "Участников: " + QString::number(e->participants().size()) + "\n";
-        textDetails->setText(text);
+    if (!e) return;
+
+    const Clock& clock = sim->schedule().clock;
+    QString text = "Название: " + QString::fromStdString(e->title()) + "\n";
+    text += "Тип: " + QString(eventKindName(e->kind())) + "\n";
+    text += "Начало: " + QString::fromStdString(clock.timeString(e->start())) + "\n";
+    text += "Конец: " + QString::fromStdString(clock.timeString(e->end())) + "\n";
+    text += "Место: " + (e->room() ? QString::fromStdString(e->room()->name()) : QString("вне фирмы")) + "\n";
+    text += "Важность: " + QString(importanceName(e->importance())) + "\n";
+    text += "Напоминаний отправлено: " + QString::number(e->remindersSent()) + "\n";
+    text += "\nУчастники (" + QString::number(e->participants().size()) + "):\n";
+    for (Employee* p : e->participants()) {
+        text += "  " + QString::fromStdString(p->name() + ", " + p->department()->name()) + "\n";
     }
+    textDetails->setText(text);
 }
 
 void MainWindow::onAdd() {

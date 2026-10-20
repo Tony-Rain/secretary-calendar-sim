@@ -19,8 +19,12 @@ public:
 
 private slots:
     void onOkClicked();
+    void onTypeChanged();
 
 private:
+    bool isTrip() const;
+    sec::Minutes startTime() const;
+
     sec::Simulation* sim;
     std::unique_ptr<sec::Event> original;
 
@@ -29,6 +33,7 @@ private:
     QDateEdit* dateEdit;
     QTimeEdit* timeEdit;
     QSpinBox* spinDur;
+    QSpinBox* spinDays;
     QComboBox* comboRoom;
     QComboBox* comboImp;
     QListWidget* listParts;
