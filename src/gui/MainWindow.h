@@ -34,6 +34,7 @@ private:
     void updateUi();
     void handleConflicts();
     void setRunning(bool running);
+    void showToday();
     void startSimulation(const sec::SimulationParams& params);
 
     sec::Simulation* sim;

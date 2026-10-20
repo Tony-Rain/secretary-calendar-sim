@@ -169,8 +169,14 @@ void MainWindow::setRunning(bool running) {
 void MainWindow::onStart() { setRunning(true); }
 void MainWindow::onStop() { setRunning(false); }
 
+void MainWindow::showToday() {
+    QDate simStart(int(sim->params().startDate.year()), unsigned(sim->params().startDate.month()), unsigned(sim->params().startDate.day()));
+    dateEdit->setDate(simStart.addDays(dayOf(sim->now())));
+}
+
 void MainWindow::onTick() {
     sim->step();
+    showToday();
     updateUi();
     if (sim->hasPending()) {
         setRunning(false);
@@ -182,6 +188,7 @@ void MainWindow::onTick() {
 void MainWindow::onStep() {
     setRunning(false);
     sim->step();
+    showToday();
     updateUi();
     setRunning(false);
     if (sim->hasPending()) handleConflicts();
