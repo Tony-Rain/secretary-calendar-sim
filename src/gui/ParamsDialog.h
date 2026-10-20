@@ -3,6 +3,7 @@
 #include "Simulation.h"
 
 class QSpinBox;
+class QDoubleSpinBox;
 class QComboBox;
 
 class ParamsDialog : public QDialog {
@@ -13,7 +14,10 @@ public:
 
 private:
     QSpinBox* spinDeps;
+    QSpinBox* spinStaff;
     QSpinBox* spinDays;
     QComboBox* comboStep;
+    QDoubleSpinBox* spinRequests;
+    QComboBox* comboMode;
     QComboBox* comboRole;
 };

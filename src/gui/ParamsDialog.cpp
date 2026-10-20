@@ -2,6 +2,7 @@
 #include <QVBoxLayout>
 #include <QFormLayout>
 #include <QSpinBox>
+#include <QDoubleSpinBox>
 #include <QComboBox>
 #include <QPushButton>
 
@@ -18,6 +19,11 @@ ParamsDialog::ParamsDialog(QWidget* parent) : QDialog(parent) {
     spinDeps->setValue(6);
     form->addRow("Количество отделов:", spinDeps);
 
+    spinStaff = new QSpinBox();
+    spinStaff->setRange(3, 12);
+    spinStaff->setValue(6);
+    form->addRow("Сотрудников в отделе:", spinStaff);
+
     spinDays = new QSpinBox();
     spinDays->setRange(7, 30);
     spinDays->setValue(14);
@@ -27,6 +33,17 @@ ParamsDialog::ParamsDialog(QWidget* parent) : QDialog(parent) {
     comboStep->addItem("30 минут", 30);
     comboStep->addItem("1 час", 60);
     form->addRow("Шаг времени:", comboStep);
+
+    spinRequests = new QDoubleSpinBox();
+    spinRequests->setRange(0, 10);
+    spinRequests->setSingleStep(0.5);
+    spinRequests->setValue(3);
+    form->addRow("Заявок в день (в среднем):", spinRequests);
+
+    comboMode = new QComboBox();
+    comboMode->addItem("Спрашивать пользователя");
+    comboMode->addItem("Решать автоматически");
+    form->addRow("Конфликты:", comboMode);
 
     comboRole = new QComboBox();
     comboRole->addItem("Администратор", 0);
@@ -44,8 +61,11 @@ ParamsDialog::ParamsDialog(QWidget* parent) : QDialog(parent) {
 SimulationParams ParamsDialog::getParams() const {
     SimulationParams p;
     p.departments = spinDeps->value();
+    p.staffPerDepartment = spinStaff->value();
     p.days = spinDays->value();
     p.step = comboStep->currentData().toInt();
+    p.requestsPerDay = spinRequests->value();
+    p.conflictMode = (comboMode->currentIndex() == 0) ? ConflictMode::Manual : ConflictMode::Auto;
 
     auto now = std::chrono::system_clock::now();
     p.startDate = std::chrono::year_month_day{ std::chrono::floor<std::chrono::days>(now) };
